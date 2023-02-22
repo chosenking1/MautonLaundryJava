@@ -29,4 +29,7 @@ public class DeliveryManagement {
 
     @Column
     private LocalDateTime return_date;
+
+    @Column(nullable = false)
+    private String address;
 }
