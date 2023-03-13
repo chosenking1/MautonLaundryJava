@@ -9,6 +9,10 @@ import lombok.Setter;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
-public class RegisterUserResponse {
+public class FindUserResponse {
+    private Long id;
     private String email;
+    private String full_name;
+    private String address;
+    private String phone_number;
 }
