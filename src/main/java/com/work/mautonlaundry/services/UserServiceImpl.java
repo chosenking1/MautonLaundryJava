@@ -7,6 +7,8 @@ import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest
 import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
+import com.work.mautonlaundry.exceptions.userexceptions.UserAlreadyExistsException;
+import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,13 +26,18 @@ ModelMapper mapper = new ModelMapper();
     public RegisterUserResponse registerUser(RegisterUserRequest request) {
         User user = new User();
         RegisterUserResponse registerResponse = new RegisterUserResponse();
+
+        if(userExist(request.getEmail())) {
+            throw new UserAlreadyExistsException("Email already exist");
+        }
+        else{
         user.setFull_name(request.getFirstname() +" "+ request.getSecond_name());
         user.setAddress(request.getAddress());
         user.setEmail(request.getEmail());
         user.setPassword(request.getPassword());
         user.setPhone_number(request.getPassword());
         User userDetails = userRepository.save(user);
-        mapper.map(userDetails, registerResponse);
+        mapper.map(userDetails, registerResponse);}
 
         return registerResponse;
     }
@@ -44,9 +51,26 @@ ModelMapper mapper = new ModelMapper();
     public FindUserResponse findUserByEmail(String userEmail) {
         FindUserResponse response = new FindUserResponse();
         userEmail = userEmail.toLowerCase();
-        Optional<User> user = userRepository.findUserByEmail(userEmail);
+        Optional<User> user = Optional.ofNullable(userRepository.findUserByEmail(userEmail).orElseThrow(() -> new UserNotFoundException("Customer Doesnt Exist")));
         mapper.map(user, response);
         return response;
+    }
+
+    @Override
+    public FindUserResponse findUserById(Long id) {
+        FindUserResponse response = new FindUserResponse();
+
+        Optional<User> user = Optional.ofNullable(userRepository.findUserById(id).orElseThrow(() -> new UserNotFoundException("Customer Doesnt Exist")));
+        mapper.map(user, response);
+        return response;
+    }
+
+    private Boolean userExist(String email){
+        return findUserByEmail(email) != null;
+    }
+
+    private Boolean userExist(Long id){
+        return findUserById(id) != null;
     }
 
     @Override
@@ -55,7 +79,26 @@ ModelMapper mapper = new ModelMapper();
     }
 
     @Override
-    public UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest request) {
-        return null;
+    public UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest user) {
+        User existingUser = new User();
+        UpdateUserDetailResponse updateResponse = new UpdateUserDetailResponse();
+
+        if(userExist(user.getId())) {
+
+            existingUser.setFull_name(user.getFirstname() +" "+ user.getSecond_name());
+            existingUser.setAddress(user.getAddress());
+            existingUser.setPhone_number(user.getPhone_number());
+            User userDetails = userRepository.save(existingUser);
+            mapper.map(userDetails, updateResponse);
+            return updateResponse;
+        }
+        else{
+
+            throw new UserAlreadyExistsException("Email already exist");
+
+        }
+
+
+
     }
 }
