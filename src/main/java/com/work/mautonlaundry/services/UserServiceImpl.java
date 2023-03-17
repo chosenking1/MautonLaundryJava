@@ -88,8 +88,9 @@ ModelMapper mapper = new ModelMapper();
             existingUser.setFull_name(user.getFirstname() +" "+ user.getSecond_name());
             existingUser.setAddress(user.getAddress());
             existingUser.setPhone_number(user.getPhone_number());
-            User userDetails = userRepository.save(existingUser);
-            mapper.map(userDetails, updateResponse);
+             userRepository.save(existingUser);
+            String message = "Details Updated Successfully";
+            mapper.map(message, updateResponse);
             return updateResponse;
         }
         else{

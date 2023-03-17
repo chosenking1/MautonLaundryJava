@@ -13,5 +13,4 @@ public class UpdateUserDetailRequest {
     private String address;
     private String firstname;
     private String second_name;
-
 }
