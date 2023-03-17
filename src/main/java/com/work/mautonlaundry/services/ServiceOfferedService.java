@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.services;
 
+import com.work.mautonlaundry.data.model.Services;
 import com.work.mautonlaundry.data.repository.ServiceRepository;
 import com.work.mautonlaundry.dtos.requests.servicerequests.AddServiceRequest;
 import com.work.mautonlaundry.dtos.requests.servicerequests.UpdateServiceRequest;
@@ -14,9 +15,9 @@ public interface ServiceOfferedService {
 
     ViewServiceResponse findServiceById(Long id);
 
-    UpdateServiceResponse userDetailsUpdate(UpdateServiceRequest request);
+    UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request);
 
-    void deleteService(Long id);
+    void deleteService(Services service);
 
 
 }

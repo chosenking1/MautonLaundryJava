@@ -95,7 +95,7 @@ ModelMapper mapper = new ModelMapper();
         }
         else{
 
-            throw new UserAlreadyExistsException("Email already exist");
+            throw new UserNotFoundException("User doesn't exist");
 
         }
 

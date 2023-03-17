@@ -1,38 +1,111 @@
 package com.work.mautonlaundry.services;
 
+import com.work.mautonlaundry.data.model.Services;
+import com.work.mautonlaundry.data.model.User;
 import com.work.mautonlaundry.data.repository.ServiceRepository;
 import com.work.mautonlaundry.dtos.requests.servicerequests.AddServiceRequest;
 import com.work.mautonlaundry.dtos.requests.servicerequests.UpdateServiceRequest;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.AddServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.UpdateServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.ViewServiceResponse;
+import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
+import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
+import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
+import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceAlreadyExistException;
+import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
+import com.work.mautonlaundry.exceptions.userexceptions.UserAlreadyExistsException;
+import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 public class ServiceOfferedServiceImpl implements ServiceOfferedService{
+    @Autowired
+   private ServiceRepository serviceRepository;
 
+    ModelMapper mapper = new ModelMapper();
     @Override
     public AddServiceResponse addService(AddServiceRequest request) {
-        return null;
+        Services service= new Services();
+
+        AddServiceResponse addResponse = new AddServiceResponse();
+
+        if(serviceExist(request.getService_name())) {
+            throw new ServiceAlreadyExistException("Service already exist");
+        }
+        else{
+            service.setService_name(request.getService_name());
+            service.setType_of_service(request.getType_of_service());
+            service.setPhotos(request.getPhotos());
+            service.setService_details(request.getService_details());
+            service.setPhotos(request.getPhotos());
+            service.setService_price(request.getService_price());
+            service.setService_price_white(request.getService_price_white());
+            Services serviceDetails = serviceRepository.save(service);
+            mapper.map(serviceDetails, addResponse);}
+
+        return addResponse;
+    }
+
+    private boolean serviceExist(Long id) {
+        return findServiceById(id) != null;
+    }
+
+    private boolean serviceExist(String service) {
+        if (findServiceByServiceName(service) == null){
+            return false;
+        };
+        return true;
+    }
+
+    private ViewServiceResponse findServiceByServiceName(String service) {
+        ViewServiceResponse response = new ViewServiceResponse();
+        service = service.toLowerCase();
+        Optional<Services> services = Optional.ofNullable(serviceRepository.findByService_name(service).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
+        mapper.map(services, response);
+        return response;
     }
 
     @Override
     public ServiceRepository getRepository() {
-        return null;
+        return serviceRepository;
     }
 
     @Override
     public ViewServiceResponse findServiceById(Long id) {
-        return null;
+        ViewServiceResponse response = new ViewServiceResponse();
+        Optional<Services> services = Optional.ofNullable(serviceRepository.findById(id).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
+        mapper.map(services, response);
+        return response;
     }
 
     @Override
-    public UpdateServiceResponse userDetailsUpdate(UpdateServiceRequest request) {
-        return null;
+    public UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request) {
+        Services existingService = new Services();
+        UpdateServiceResponse updateResponse = new UpdateServiceResponse();
+
+        if(serviceExist(request.getId())) {
+            mapper.map(request, existingService);
+            serviceRepository.save(existingService);
+            String message = "Details Updated Successfully";
+            mapper.map(message, updateResponse);
+            return updateResponse;
+        }
+        else{
+
+            throw new ServiceNotFoundException("Service Not Found");
+
+        }
     }
+
+
 
     @Override
-    public void deleteService(Long id) {
-
+    public void deleteService(Services service) {
+        serviceRepository.delete(service);
     }
+
 }
