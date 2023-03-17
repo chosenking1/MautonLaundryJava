@@ -17,7 +17,7 @@ public interface ServiceOfferedService {
 
     UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request);
 
-    void deleteService(Services service);
+    void deleteService(Long id);
 
 
 }

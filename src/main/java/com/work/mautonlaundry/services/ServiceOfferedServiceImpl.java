@@ -1,19 +1,14 @@
 package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.Services;
-import com.work.mautonlaundry.data.model.User;
 import com.work.mautonlaundry.data.repository.ServiceRepository;
 import com.work.mautonlaundry.dtos.requests.servicerequests.AddServiceRequest;
 import com.work.mautonlaundry.dtos.requests.servicerequests.UpdateServiceRequest;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.AddServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.UpdateServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.ViewServiceResponse;
-import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
-import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
-import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceAlreadyExistException;
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
-import com.work.mautonlaundry.exceptions.userexceptions.UserAlreadyExistsException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,15 +50,12 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
     }
 
     private boolean serviceExist(String service) {
-        if (findServiceByServiceName(service) == null){
-            return false;
-        };
-        return true;
+        return findServiceByServiceName(service) != null;
     }
 
     private ViewServiceResponse findServiceByServiceName(String service) {
         ViewServiceResponse response = new ViewServiceResponse();
-        service = service.toLowerCase();
+//        service = service.toLowerCase();
         Optional<Services> services = Optional.ofNullable(serviceRepository.findByService_name(service).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
         mapper.map(services, response);
         return response;
@@ -101,11 +93,9 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
         }
     }
 
-
-
     @Override
-    public void deleteService(Services service) {
-        serviceRepository.delete(service);
+    public void deleteService(Long id) {
+        serviceRepository.deleteById(id);
     }
 
 }
