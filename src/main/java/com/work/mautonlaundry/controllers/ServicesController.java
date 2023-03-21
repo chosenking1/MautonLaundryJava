@@ -35,7 +35,6 @@ public class ServicesController {
         return serviceOffered.getRepository().findAll();
     }
 
-
     @PutMapping("/updateService")
     public UpdateServiceResponse updateServiceDetails(@RequestBody UpdateServiceRequest request)
     {
