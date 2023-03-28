@@ -24,11 +24,14 @@ public class Booking {
     @Column
     private String email;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ServiceType type_of_service;
 
-    @Column(columnDefinition = "json")
-    private String service;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String service = "[]";
+
+
 
     @Column(nullable = false)
     private LocalDateTime date_booked;
@@ -36,14 +39,12 @@ public class Booking {
     @Column(nullable = false)
     private String address;
 
+    @Enumerated(EnumType.STRING)
     @Column
     private UrgencyType urgency;
 
     @Column(nullable = false)
-    private int total_price;
-
-
-
+    private Double total_price;
 
 
 }

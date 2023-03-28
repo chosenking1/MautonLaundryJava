@@ -55,7 +55,6 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
 
     private ViewServiceResponse findServiceByServiceName(String service) {
         ViewServiceResponse response = new ViewServiceResponse();
-//        service = service.toLowerCase();
         Optional<Services> services = Optional.ofNullable(serviceRepository.findByService_name(service).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
         mapper.map(services, response);
         return response;

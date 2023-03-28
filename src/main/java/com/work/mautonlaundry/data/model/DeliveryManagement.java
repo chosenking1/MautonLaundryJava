@@ -32,4 +32,8 @@ public class DeliveryManagement {
 
     @Column(nullable = false)
     private String address;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private UrgencyType urgency;
 }

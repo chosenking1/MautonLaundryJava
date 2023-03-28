@@ -5,15 +5,10 @@ import com.work.mautonlaundry.data.model.UrgencyType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-import javax.persistence.Column;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.validation.constraints.Email;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
 
 @Setter
 @Getter
@@ -26,7 +21,8 @@ public class RegisterBookingRequest {
 
     private ServiceType type_of_service;
 
-    private String service;
+    private JSONArray service;
+
 
     private LocalDateTime date_booked;
 
@@ -34,5 +30,4 @@ public class RegisterBookingRequest {
 
     private UrgencyType urgency;
 
-    private int total_price;
 }
