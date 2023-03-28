@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.time.LocalDateTime;
 
@@ -22,7 +21,6 @@ public class RegisterBookingRequest {
     private ServiceType type_of_service;
 
     private JSONArray service;
-
 
     private LocalDateTime date_booked;
 

@@ -1,7 +1,6 @@
 package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.Booking;
-import com.work.mautonlaundry.data.model.DeliveryManagement;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.RegisterBookingRequest;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.UpdateBookingRequest;
