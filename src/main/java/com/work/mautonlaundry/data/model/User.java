@@ -37,5 +37,6 @@ public class User {
     @Column
     private String phone_number;
 
-
+    @Column
+    private Boolean deleted;
 }

@@ -46,5 +46,8 @@ public class Booking {
     @Column(nullable = false)
     private Double total_price;
 
+    @Column
+    private Boolean deleted;
+
 
 }

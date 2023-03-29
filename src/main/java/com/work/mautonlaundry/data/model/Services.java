@@ -38,7 +38,7 @@ public class Services {
     @Column(nullable = false, length = 100)
     private String photos;
 
-
-
+    @Column
+    private Boolean deleted;
 
 }

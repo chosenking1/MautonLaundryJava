@@ -36,4 +36,11 @@ public class DeliveryManagement {
     @Enumerated(EnumType.STRING)
     @Column
     private UrgencyType urgency;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private DeliveryStatus deliveryStatus;
+
+    @Column
+    private Boolean deleted;
 }
