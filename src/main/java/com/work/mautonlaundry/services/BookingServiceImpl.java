@@ -1,6 +1,7 @@
 package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.Booking;
+import com.work.mautonlaundry.data.model.LaundryStatus;
 import com.work.mautonlaundry.data.model.Services;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.RegisterBookingRequest;
@@ -9,8 +10,10 @@ import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupReq
 import com.work.mautonlaundry.dtos.responses.bookingresponse.RegisterBookingResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.UpdateBookingResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.ViewBookingResponse;
+import com.work.mautonlaundry.dtos.responses.serviceresponse.UpdateServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.ViewServiceResponse;
 import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
+import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -19,6 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+
+import static org.springframework.util.ObjectUtils.isEmpty;
 
 @Service
 public class BookingServiceImpl implements BookingService{
@@ -46,7 +51,9 @@ public class BookingServiceImpl implements BookingService{
             booking.setUrgency(request.getUrgency());
             booking.setDate_booked(request.getDate_booked());
             booking.setTotal_price(totalPriceCalculation(request.getService()));
+            booking.setLaundryStatus(LaundryStatus.PENDING);
             Booking bookingDetails = bookingRepository.save(booking);
+
             mapper.map(bookingDetails, pickupRequest);
             deliveryManagementService.createPickup(pickupRequest);
             mapper.map(bookingDetails, registerBookingResponse);
@@ -88,12 +95,29 @@ public class BookingServiceImpl implements BookingService{
         Optional<Booking> bookings = Optional.of(bookingRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
         mapper.map(bookings, response);
         return response;
-
     }
 
     @Override
     public UpdateBookingResponse bookingDetailsUpdate(UpdateBookingRequest request) {
-        return null;
+        Booking existingBooking = new Booking();
+        UpdateBookingResponse updateResponse = new UpdateBookingResponse();
+
+        if(bookingExist(request.getId())) {
+            mapper.map(request, existingBooking);
+            bookingRepository.save(existingBooking);
+            String message = "Details Updated Successfully";
+            mapper.map(message, updateResponse);
+            return updateResponse;
+        }
+        else{
+
+            throw new ServiceNotFoundException("Service Not Found");
+
+        }
+    }
+
+    private boolean bookingExist(Long id){
+        return !isEmpty(viewBooking(id));
     }
 
     @Override

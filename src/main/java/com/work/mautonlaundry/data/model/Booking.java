@@ -43,6 +43,10 @@ public class Booking {
     @Column
     private UrgencyType urgency;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private LaundryStatus laundryStatus;
+
     @Column(nullable = false)
     private Double total_price;
 
