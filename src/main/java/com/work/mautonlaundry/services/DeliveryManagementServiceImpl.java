@@ -1,14 +1,11 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.DeliveryManagement;
 import com.work.mautonlaundry.data.model.DeliveryStatus;
 import com.work.mautonlaundry.data.model.UrgencyType;
 import com.work.mautonlaundry.data.repository.DeliveryManagementRepository;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupRequest;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupStatusUpdateRequest;
-import com.work.mautonlaundry.dtos.responses.bookingresponse.UpdateBookingResponse;
-import com.work.mautonlaundry.dtos.responses.bookingresponse.ViewBookingResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusUpdateResponse;
@@ -29,6 +26,7 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
     @Autowired
     private DeliveryManagementRepository deliveryRepository;
     ModelMapper mapper = new ModelMapper();
+
     /**
      * @param request
      * @return
