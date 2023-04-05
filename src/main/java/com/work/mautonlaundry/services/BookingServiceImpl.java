@@ -2,7 +2,6 @@ package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.LaundryStatus;
-import com.work.mautonlaundry.data.model.Services;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.RegisterBookingRequest;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.UpdateBookingRequest;
@@ -10,8 +9,6 @@ import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupReq
 import com.work.mautonlaundry.dtos.responses.bookingresponse.RegisterBookingResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.UpdateBookingResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.ViewBookingResponse;
-import com.work.mautonlaundry.dtos.responses.serviceresponse.UpdateServiceResponse;
-import com.work.mautonlaundry.dtos.responses.serviceresponse.ViewServiceResponse;
 import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
@@ -63,17 +60,14 @@ public class BookingServiceImpl implements BookingService{
     }
 
     private Double totalPriceCalculation(JSONArray service) {
-//        Double totalPrice;
-        Double totalPrice = 0.0;
+        double totalPrice = 0.0;
         for (int i = 0; i < service.length(); i++) {
             JSONObject services = service.getJSONObject(i);
-            Double price = services.getDouble("price");
+            double price = services.getDouble("price");
             totalPrice += price;
         }
         return totalPrice;
     }
-
-
 
     @Override
     public BookingRepository getRepository() {
@@ -84,7 +78,7 @@ public class BookingServiceImpl implements BookingService{
     @Override
     public ViewBookingResponse viewBooking(Long id) {
         ViewBookingResponse response = new ViewBookingResponse();
-        Optional<Booking> booking = Optional.ofNullable(bookingRepository.findById(id).orElseThrow(() -> new BookingNotFoundException("Service Doesnt Exist")));
+        Optional<Booking> booking = Optional.ofNullable(bookingRepository.findById(id).orElseThrow(() -> new BookingNotFoundException("Booking Doesnt Exist")));
         mapper.map(booking, response);
         return response;
     }
@@ -122,11 +116,11 @@ public class BookingServiceImpl implements BookingService{
 
     @Override
     public void deleteBooking(Long id) {
-
+        bookingRepository.deleteById(id);
     }
 
     @Override
     public void deleteBooking(String email) {
-
+        bookingRepository.deleteByEmail(email);
     }
 }

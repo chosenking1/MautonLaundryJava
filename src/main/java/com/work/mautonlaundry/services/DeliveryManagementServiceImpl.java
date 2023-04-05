@@ -1,18 +1,28 @@
 package com.work.mautonlaundry.services;
 
+import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.DeliveryManagement;
+import com.work.mautonlaundry.data.model.DeliveryStatus;
 import com.work.mautonlaundry.data.model.UrgencyType;
 import com.work.mautonlaundry.data.repository.DeliveryManagementRepository;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupRequest;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupStatusUpdateRequest;
+import com.work.mautonlaundry.dtos.responses.bookingresponse.UpdateBookingResponse;
+import com.work.mautonlaundry.dtos.responses.bookingresponse.ViewBookingResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusUpdateResponse;
+import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
+import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
+import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
+
+import static org.springframework.util.ObjectUtils.isEmpty;
 
 @Service
 public class DeliveryManagementServiceImpl implements DeliveryManagementService{
@@ -33,8 +43,8 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
         deliveryManagement.setBooking_id(request.getId());
         deliveryManagement.setPick_up(calculatePickUpDate(request.getDate_booked()));
         deliveryManagement.setUrgency(request.getUrgency());
+        deliveryManagement.setDeliveryStatus(DeliveryStatus.PENDING_PICKUP);
         deliveryManagement.setReturn_date(calculateReturnDate(deliveryManagement.getPick_up(), request.getUrgency()));
-
 
         DeliveryManagement bookingDetails = deliveryRepository.save(deliveryManagement);
 
@@ -72,8 +82,11 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
      */
     @Override
     public PickupStatusResponse findPickupById(Long id) {
+        PickupStatusResponse response = new PickupStatusResponse();
+        Optional<DeliveryManagement> deliveryManagement = Optional.ofNullable(deliveryRepository.findById(id).orElseThrow(() -> new BookingNotFoundException("Delivery Doesnt Exist")));
+        mapper.map(deliveryManagement, response);
+        return response;
 
-        return null;
     }
 
     /**
@@ -82,7 +95,11 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
      */
     @Override
     public PickupStatusResponse findPickupByEmail(String email) {
-        return null;
+        PickupStatusResponse response = new PickupStatusResponse();
+        Optional<DeliveryManagement> deliveryManagement = Optional.of(deliveryRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException("Delivery Doesnt Exist")));
+        mapper.map(deliveryManagement, response);
+        return response;
+
     }
 
     /**
@@ -91,7 +108,26 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
      */
     @Override
     public PickupStatusUpdateResponse pickupUpdate(PickupStatusUpdateRequest request) {
-        return null;
+        DeliveryManagement existingDelivery = new DeliveryManagement();
+        PickupStatusUpdateResponse updateResponse = new PickupStatusUpdateResponse();
+
+        if(deliveryExist(request.getId())) {
+            mapper.map(request, existingDelivery);
+            deliveryRepository.save(existingDelivery);
+            String message = "Details Updated Successfully";
+            mapper.map(message, updateResponse);
+            return updateResponse;
+        }
+        else{
+
+            throw new ServiceNotFoundException("Delivery Not Found");
+
+        }
+
+    }
+
+    private boolean deliveryExist(Long id) {
+        return !isEmpty(findPickupById(id));
     }
 
     /**
@@ -99,14 +135,14 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
      */
     @Override
     public void deletePickup(Long id) {
-
+        deliveryRepository.deleteById(id);
     }
 
     /**
-     * @param Email
+     * @param email
      */
     @Override
-    public void deletePickup(String Email) {
-
+    public void deletePickup(String email) {
+        deliveryRepository.deleteByEmail(email);
     }
 }
