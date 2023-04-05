@@ -33,7 +33,7 @@ public class DeliveryController {
     }
 
     @GetMapping("/viewAllDelivery")
-    public Collection<DeliveryManagement> viewAllBooking() {
+    public Collection<DeliveryManagement> viewAllDelivery() {
 
         return deliveryService.getRepository().findAll();
     }
@@ -44,8 +44,8 @@ public class DeliveryController {
         return deliveryService.pickupUpdate(request);
     }
 
-    @DeleteMapping("/services/{id}")
-    public ResponseEntity<?> deleteService(@PathVariable("id") Long id) {
+    @DeleteMapping("/delivery/{id}")
+    public ResponseEntity<?> deleteDelivery(@PathVariable("id") Long id) {
         try {
             deliveryService.deletePickup(id);
             return ResponseEntity.ok().build();
