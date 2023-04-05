@@ -28,8 +28,8 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
     ModelMapper mapper = new ModelMapper();
 
     /**
-     * @param request
-     * @return
+     * @param request a pickup
+     * @return a string
      */
     @Override
     public PickupResponse createPickup(PickupRequest request) {
