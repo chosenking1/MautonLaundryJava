@@ -11,6 +11,9 @@ import com.work.mautonlaundry.exceptions.userexceptions.UserAlreadyExistsExcepti
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -34,7 +37,7 @@ ModelMapper mapper = new ModelMapper();
         user.setFull_name(request.getFirstname() +" "+ request.getSecond_name());
         user.setAddress(request.getAddress());
         user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
+        user.setPassword(setPassword(request.getPassword()));
         user.setPhone_number(request.getPassword());
         User userDetails = userRepository.save(user);
         mapper.map(userDetails, registerResponse);}
@@ -71,6 +74,13 @@ ModelMapper mapper = new ModelMapper();
 
     private Boolean userExist(Long id){
         return findUserById(id) != null;
+    }
+
+    private String setPassword(String password) {
+//        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+//        return passwordEncoder.encode(password);
+      return BCrypt.hashpw(password, BCrypt.gensalt());
+
     }
 
     @Override
