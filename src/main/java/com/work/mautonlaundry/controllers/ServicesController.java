@@ -7,7 +7,6 @@ import com.work.mautonlaundry.dtos.responses.serviceresponse.AddServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.UpdateServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.ViewServiceResponse;
 import com.work.mautonlaundry.services.ServiceOfferedService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,8 +16,13 @@ import java.util.Collection;
 
 @RestController
 public class ServicesController {
-    @Autowired
-    private ServiceOfferedService serviceOffered;
+
+    private final ServiceOfferedService serviceOffered;
+
+    public ServicesController(ServiceOfferedService serviceOffered) {
+        this.serviceOffered = serviceOffered;
+    }
+
 
     @PostMapping("/addService")
     public AddServiceResponse addService(@RequestBody AddServiceRequest request){
@@ -43,14 +47,16 @@ public class ServicesController {
 
     @DeleteMapping("/services/{id}")
     public ResponseEntity<?> deleteService(@PathVariable("id") Long id) {
-        try {
-            serviceOffered.deleteService(id);
-            return ResponseEntity.ok().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+//        try {
+//            serviceOffered.deleteService(id);
+//            return ResponseEntity.ok().build();
+//        } catch (EntityNotFoundException e) {
+//            return ResponseEntity.notFound().build();
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+//        }
+        serviceOffered.deleteService(id);
+        return ResponseEntity.ok().build();
     }
 
 }

@@ -1,9 +1,9 @@
 package com.work.mautonlaundry.data.model;
 
+import jakarta.validation.constraints.Email;
 import lombok.*;
 
 import javax.persistence.*;
-import javax.validation.constraints.Email;
 import java.time.LocalDateTime;
 
 @Entity

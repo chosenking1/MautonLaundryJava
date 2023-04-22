@@ -1,6 +1,7 @@
 package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.User;
+import com.work.mautonlaundry.data.model.UserRole;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.dtos.requests.userrequests.RegisterUserRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest;
@@ -11,15 +12,18 @@ import com.work.mautonlaundry.exceptions.userexceptions.UserAlreadyExistsExcepti
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCrypt;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import java.util.*;
 
 @Service
-public class UserServiceImpl implements UserService{
+public class UserServiceImpl implements UserService, UserDetailsService {
 @Autowired
 private UserRepository userRepository;
 
@@ -37,9 +41,11 @@ ModelMapper mapper = new ModelMapper();
         user.setFull_name(request.getFirstname() +" "+ request.getSecond_name());
         user.setAddress(request.getAddress());
         user.setEmail(request.getEmail());
+        user.setUserRole(UserRole.USER);
         user.setPassword(setPassword(request.getPassword()));
         user.setPhone_number(request.getPassword());
         User userDetails = userRepository.save(user);
+
         mapper.map(userDetails, registerResponse);}
 
         return registerResponse;
@@ -57,6 +63,23 @@ ModelMapper mapper = new ModelMapper();
         Optional<User> user = Optional.ofNullable(userRepository.findUserByEmail(userEmail).orElseThrow(() -> new UserNotFoundException("Customer Doesnt Exist")));
         mapper.map(user, response);
         return response;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepository.findUserByEmail(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
+
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getUserRole().name()));
+
+        return new org.springframework.security.core.userdetails.User(user.getEmail(), user.getPassword(), authorities);
+    }
+
+    private Set<SimpleGrantedAuthority> getAuthority(User user) {
+        Set<SimpleGrantedAuthority> authorities = new HashSet<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getUserRole().name()));
+        return authorities;
     }
 
     @Override
@@ -109,6 +132,10 @@ ModelMapper mapper = new ModelMapper();
 
         }
 
+        //Todo Admin/Delivery/Laundry Agent should change there password after being registered by the Superadmin
+        //Todo Only this guys should be able to access the link
+        //Todo user should also be able to do that but that is done by them
+        //Todo Only admins can change user role
 
 
     }

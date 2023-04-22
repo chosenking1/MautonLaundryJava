@@ -7,6 +7,8 @@ import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest
 import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 public interface UserService {
 
@@ -15,6 +17,7 @@ public interface UserService {
     UserRepository getRepository();
 
     FindUserResponse findUserByEmail(String userEmail);
+
 
     FindUserResponse findUserById(Long id);
 

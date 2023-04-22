@@ -1,10 +1,11 @@
 package com.work.mautonlaundry.dtos.requests.userrequests;
 
+import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.validation.constraints.Email;
+
 
 @Setter
 @Getter

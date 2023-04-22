@@ -17,7 +17,7 @@ public class Services {
     private Long id;
 
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, name = "",nullable = false)
     private String service_name;
 
     @Column(nullable = false)

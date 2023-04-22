@@ -11,17 +11,23 @@ import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceAlreadyExistEx
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
 @Service
 public class ServiceOfferedServiceImpl implements ServiceOfferedService{
-    @Autowired
-   private ServiceRepository serviceRepository;
+//    @Autowired
+    private final ServiceRepository serviceRepository ;
 
     ModelMapper mapper = new ModelMapper();
+
+    public ServiceOfferedServiceImpl(ServiceRepository serviceRepository) {
+        this.serviceRepository = serviceRepository;
+    }
+
     @Override
     public AddServiceResponse addService(AddServiceRequest request) {
         Services service= new Services();
@@ -53,16 +59,13 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
         return findServiceByServiceName(service) != null;
     }
 
-    private ViewServiceResponse findServiceByServiceName(String service) {
+    private Services findServiceByServiceName(String service) {
         ViewServiceResponse response = new ViewServiceResponse();
-        Optional<Services> services = Optional.ofNullable(serviceRepository.findByService_name(service).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
-        mapper.map(services, response);
-        return response;
-    }
+//        Optional<Services> services = Optional.ofNullable(serviceRepository.findByService_name(service).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
+//        mapper.map(services, response);
+//        return response;
+        return serviceRepository.findServicesByService_name(service).orElseThrow(()-> new UsernameNotFoundException("user name not found"));
 
-    @Override
-    public ServiceRepository getRepository() {
-        return serviceRepository;
     }
 
     @Override
@@ -72,6 +75,12 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
         mapper.map(services, response);
         return response;
     }
+    @Override
+    public ServiceRepository getRepository() {
+        return serviceRepository;
+    }
+
+
 
     @Override
     public UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request) {

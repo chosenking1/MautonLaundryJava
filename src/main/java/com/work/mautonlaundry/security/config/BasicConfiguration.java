@@ -2,8 +2,6 @@ package com.work.mautonlaundry.security.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.SecurityBuilder;
-import org.springframework.security.config.annotation.web.WebSecurityConfigurer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -15,8 +13,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
-public class BasicConfiguration implements WebSecurityConfigurer {
-
+public class BasicConfiguration {
     @Bean
     public InMemoryUserDetailsManager userDetailsService(PasswordEncoder passwordEncoder) {
         UserDetails user = User.withUsername("user")
@@ -46,23 +43,5 @@ public class BasicConfiguration implements WebSecurityConfigurer {
     public PasswordEncoder passwordEncoder() {
         PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
         return encoder;
-    }
-
-    /**
-     * @param builder
-     * @throws Exception
-     */
-    @Override
-    public void init(SecurityBuilder builder) throws Exception {
-
-    }
-
-    /**
-     * @param builder
-     * @throws Exception
-     */
-    @Override
-    public void configure(SecurityBuilder builder) throws Exception {
-
     }
 }
