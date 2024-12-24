@@ -7,12 +7,13 @@ import com.work.mautonlaundry.dtos.responses.bookingresponse.RegisterBookingResp
 import com.work.mautonlaundry.dtos.responses.bookingresponse.UpdateBookingResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.ViewBookingResponse;
 import com.work.mautonlaundry.services.BookingService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.persistence.EntityNotFoundException;
+
 import java.util.Collection;
 
 @RestController

@@ -1,18 +1,20 @@
 package com.work.mautonlaundry.data.model;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import lombok.*;
 
-import javax.persistence.*;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @Setter
 @NoArgsConstructor
+@Table(name = "booking")
 public class Booking {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
 

@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.data.model;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -7,7 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.validation.annotation.Validated;
 
-import javax.persistence.*;
+
 
 
 @Entity
@@ -18,9 +19,9 @@ import javax.persistence.*;
 
 public class User {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
-    private Long id;
+    private String id;
 
     @Email
     @Column(unique = true)
@@ -41,6 +42,7 @@ public class User {
     @Column
     private Boolean deleted;
 
-    @Column
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private UserRole userRole;
 }

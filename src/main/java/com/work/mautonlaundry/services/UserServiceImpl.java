@@ -18,14 +18,22 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 @Service
 public class UserServiceImpl implements UserService, UserDetailsService {
-@Autowired
+
+    @Autowired
 private UserRepository userRepository;
+
+
+private UserRole userRole;
+
+@Autowired
+private PasswordEncoder passwordEncoder;
 
 ModelMapper mapper = new ModelMapper();
 
@@ -34,7 +42,7 @@ ModelMapper mapper = new ModelMapper();
         User user = new User();
         RegisterUserResponse registerResponse = new RegisterUserResponse();
 
-        if(userExist(request.getEmail())) {
+        if(userEmailExist(request.getEmail())) {
             throw new UserAlreadyExistsException("Email already exist");
         }
         else{
@@ -43,7 +51,7 @@ ModelMapper mapper = new ModelMapper();
         user.setEmail(request.getEmail());
         user.setUserRole(UserRole.USER);
         user.setPassword(setPassword(request.getPassword()));
-        user.setPhone_number(request.getPassword());
+        user.setPhone_number(request.getPhone_number());
         User userDetails = userRepository.save(user);
 
         mapper.map(userDetails, registerResponse);}
@@ -73,7 +81,10 @@ ModelMapper mapper = new ModelMapper();
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getUserRole().name()));
 
-        return new org.springframework.security.core.userdetails.User(user.getEmail(), user.getPassword(), authorities);
+        return new org.springframework.security.core.userdetails.User(
+                user.getEmail(),
+                user.getPassword(),
+                authorities);
     }
 
     private Set<SimpleGrantedAuthority> getAuthority(User user) {
@@ -83,7 +94,7 @@ ModelMapper mapper = new ModelMapper();
     }
 
     @Override
-    public FindUserResponse findUserById(Long id) {
+    public FindUserResponse findUserById(String id) {
         FindUserResponse response = new FindUserResponse();
 
         Optional<User> user = Optional.ofNullable(userRepository.findUserById(id).orElseThrow(() -> new UserNotFoundException("Customer Doesnt Exist")));
@@ -91,11 +102,12 @@ ModelMapper mapper = new ModelMapper();
         return response;
     }
 
-    private Boolean userExist(String email){
-        return findUserByEmail(email) != null;
+    private Boolean userEmailExist(String email) {
+        return userRepository.findUserByEmail(email).isPresent();
     }
 
-    private Boolean userExist(Long id){
+
+    private Boolean userIdExist(String id){
         return findUserById(id) != null;
     }
 
@@ -116,7 +128,7 @@ ModelMapper mapper = new ModelMapper();
         User existingUser = new User();
         UpdateUserDetailResponse updateResponse = new UpdateUserDetailResponse();
 
-        if(userExist(user.getId())) {
+        if(userIdExist(user.getId())) {
 
             existingUser.setFull_name(user.getFirstname() +" "+ user.getSecond_name());
             existingUser.setAddress(user.getAddress());
