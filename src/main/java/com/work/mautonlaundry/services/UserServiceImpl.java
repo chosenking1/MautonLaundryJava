@@ -123,32 +123,65 @@ ModelMapper mapper = new ModelMapper();
         userRepository.delete(user);
     }
 
+//    @Override
+//    public UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest user) {
+//        User existingUser = new User();
+//        UpdateUserDetailResponse updateResponse = new UpdateUserDetailResponse();
+//
+//        if(userIdExist(user.getId())) {
+//
+//            existingUser.setFull_name(user.getFirstname() +" "+ user.getSecond_name());
+//            existingUser.setAddress(user.getAddress());
+//            existingUser.setPhone_number(user.getPhone_number());
+//             userRepository.save(existingUser);
+//            String message = "Details Updated Successfully";
+//            mapper.map(message, updateResponse);
+//            return updateResponse;
+//        }
+//        else{
+//
+//            throw new UserNotFoundException("User doesn't exist");
+//
+//        }
+
     @Override
     public UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest user) {
-        User existingUser = new User();
         UpdateUserDetailResponse updateResponse = new UpdateUserDetailResponse();
 
-        if(userIdExist(user.getId())) {
+        // Check if the user exists
+        if (userIdExist(user.getId())) {
+            // Fetch the existing user from the database
+            Optional<User> existingUserOptional = userRepository.findUserById(user.getId());
 
-            existingUser.setFull_name(user.getFirstname() +" "+ user.getSecond_name());
-            existingUser.setAddress(user.getAddress());
-            existingUser.setPhone_number(user.getPhone_number());
-             userRepository.save(existingUser);
-            String message = "Details Updated Successfully";
-            mapper.map(message, updateResponse);
-            return updateResponse;
-        }
-        else{
+            if (existingUserOptional.isPresent()) {
+                User existingUser = existingUserOptional.get();
 
+                // Update only the necessary fields
+                existingUser.setFull_name(user.getFirstname() + " " + user.getSecond_name());
+                existingUser.setAddress(user.getAddress());
+                existingUser.setPhone_number(user.getPhone_number());
+
+                // Save the updated user
+                userRepository.save(existingUser);
+
+                String message = "Details Updated Successfully";
+                mapper.map(message, updateResponse);
+                return updateResponse;
+            } else {
+                throw new UserNotFoundException("User doesn't exist");
+            }
+        } else {
             throw new UserNotFoundException("User doesn't exist");
-
         }
+    }
 
-        //Todo Admin/Delivery/Laundry Agent should change there password after being registered by the Superadmin
+
+
+    //Todo Admin/Delivery/Laundry Agent should change there password after being registered by the Superadmin
         //Todo Only this guys should be able to access the link
         //Todo user should also be able to do that but that is done by them
         //Todo Only admins can change user role
 
 
-    }
+
 }

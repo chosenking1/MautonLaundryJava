@@ -31,7 +31,7 @@ public class JwtTokenProvider {
                 .setSubject(username)
                 .setIssuedAt(currentDate)
                 .setExpiration(expireDate)
-                .signWith(SignatureAlgorithm.HS256, key())
+                .signWith(key())
                 .compact();
     }
 
@@ -48,7 +48,7 @@ public class JwtTokenProvider {
     public String getUsername(String token) {
         return Jwts.parser()
                 .setSigningKey(key()) // Changed verifyWith to setSigningKey
-//                .build()
+                .build()
                 .parseClaimsJws(token) // Use parseClaimsJws instead of parseSignedClaims
                 .getBody()
                 .getSubject();
@@ -58,7 +58,7 @@ public class JwtTokenProvider {
     public boolean validateToken(String token) {
         Jwts.parser()
                 .setSigningKey(key()) // Changed verifyWith to setSigningKey
-//                .build()
+                .build()
                 .parseClaimsJws(token); // Use parseClaimsJws instead of parse
         return true;
     }

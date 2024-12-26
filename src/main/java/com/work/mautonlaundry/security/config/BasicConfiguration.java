@@ -25,7 +25,10 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import static org.springframework.security.config.http.SessionCreationPolicy.STATELESS;
+
 @Configuration(proxyBeanMethods = false)
+@EnableWebSecurity
 @EnableMethodSecurity
 @AllArgsConstructor
 public class BasicConfiguration{
@@ -35,54 +38,71 @@ public class BasicConfiguration{
     private JwtAuthenticationFilter authenticationFilter;
 
 
-//    @Bean
-//    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder){
-//        UserDetails admin = User.withUsername("Basant")
-//                .password(passwordEncoder.encode("password"))
-//                .roles("ADMIN")
-//                .build();
-//
-//        UserDetails user = User.withUsername("John")
-//                .password(passwordEncoder.encode("password"))
-//                .roles("USER")
-//                .build();
-//
-//        return new InMemoryUserDetailsManager(admin, user);
-//    }
-
-
 
     @Bean
     public static PasswordEncoder passwordEncoder(){
         return new BCryptPasswordEncoder();
     }
 
-    @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
-        http.csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests((authorize) -> {
-                    authorize.requestMatchers("/register").permitAll();
-                    authorize.requestMatchers("/", "/**").permitAll();
-                    authorize.requestMatchers("/error").permitAll();
-                    authorize.requestMatchers("/api/auth/**").permitAll();
+//    @Bean
+//    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+//
+//        http.csrf(AbstractHttpConfigurer::disable)
+//                .authorizeHttpRequests((authorize) -> {
+//                    authorize.requestMatchers("/register").permitAll();
+//                    authorize.requestMatchers("/addService").permitAll();
+////                    authorize.requestMatchers("/", "/**").permitAll();
+//                    authorize.requestMatchers("api/auth/login", "/register",
+//                            "/v1/api/**",
+//                            "/v2/api-docs",
+//                            "/v3/api-docs",
+//                            "/v3/api-docs/**","/swagger-resources",
+//                            "/swagger-resources/**",
+//                            "/configuration/ui",
+//                            "/configuration/security",
+//                            "/swagger-ui/**",
+//                            "/swagger-ui.html").permitAll();
+//                    authorize.requestMatchers( "/admin").hasRole("ADMIN");
+//                    authorize.requestMatchers("/api/auth/**").permitAll();
+////                    authorize.requestMatchers(HttpMethod.POST,"/**").hasRole("ADMIN");
+//                    authorize.requestMatchers("/error").permitAll();
+//
 //                    authorize.requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN");
-//                    authorize.requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN");
-//                    authorize.requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN");
-//                    authorize.requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("ADMIN", "USER");
-                    authorize.requestMatchers(HttpMethod.PATCH, "/api/user").hasAnyRole("ADMIN", "USER");
-//                    authorize.requestMatchers(HttpMethod.GET, "/api/**").permitAll();
-//                    authorize.requestMatchers("api/auth/signup", "/auth/addNewUser").permitAll();
+////                    authorize.requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN");
+////                    authorize.requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN");
+////                    authorize.requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("ADMIN", "USER");
+//                    authorize.requestMatchers(HttpMethod.PATCH, "/api/user").hasAnyRole("ADMIN", "USER");
+////                    authorize.requestMatchers(HttpMethod.GET, "/api/**").permitAll();
+//
+//
+//                    authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+//                    authorize.anyRequest().authenticated();
+//                })
+////                .sessionManagement(session -> session.sessionCreationPolicy(STATELESS));
+////        System.out.println("Configuring Success ...");
+//                .httpBasic(Customizer.withDefaults());
+//
+//        return http.build();
+//    }
 
-                    authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
-                    authorize.anyRequest().authenticated();
-                }).httpBasic(Customizer.withDefaults());
-
-        http.exceptionHandling( exception -> exception
-                .authenticationEntryPoint(authenticationEntryPoint));
-
-        http.addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
+ @Bean public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests((authorize) -> authorize
+                        .requestMatchers("/register").permitAll()
+//                        .requestMatchers(HttpMethod.POST,"/addService").hasRole("ADMIN")
+                        .requestMatchers("/api/auth/login", "/register", "/v1/api/**", "/v2/api-docs", "/v3/api-docs", "/v3/api-docs/**", "/swagger-resources", "/swagger-resources/**", "/configuration/ui", "/configuration/security", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/admin").hasRole("ADMIN")
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/user").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(authenticationEntryPoint) )
+                .httpBasic(Customizer.withDefaults());
         return http.build();
     }
 

@@ -38,7 +38,7 @@ public class JwtService {
                 .setSubject(userName)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 30)) // Token valid for 30 minutes
-                .signWith(SignatureAlgorithm.HS256, getSignKey())
+                .signWith(getSignKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -66,25 +66,13 @@ public class JwtService {
 
     // Extract all claims from the token
     private Claims extractAllClaims(String token) {
-//        return Jwts.parser()
-//                .setSigningKey(getSignKey())
-//                .parseClaimsJws(token)
-//                .getBody();
-//
 
-
-    try {
         return Jwts.parser()
                 .setSigningKey(getSignKey())
-                .parseClaimsJws(token)
-                .getBody();
-    } catch (SignatureException e) {
-        // handle the signature exception
-        throw new RuntimeException("JWT signature does not match locally computed signature.");
-    } catch (Exception e) {
-        // handle other exceptions
-        throw new RuntimeException("Failed to parse JWT.");
-    }
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
 }
     // Check if the token is expired
     private Boolean isTokenExpired(String token) {
