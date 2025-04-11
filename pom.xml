@@ -299,8 +299,7 @@
             <id>native</id>
             <properties>
                 <repackage.classifier>exec</repackage.classifier>
-<!--                <native-buildtools.version>0.9.11</native-buildtools.version>-->
-<!--                <native-buildtools.version>21.2.0</native-buildtools.version>-->
+
 
             </properties>
             <dependencies>
@@ -369,10 +368,20 @@
                             </execution>
                         </executions>
                     </plugin>
+
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
+                        <version>0.9.22</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                     </plugin>
+
 
                     <plugin>
                         <groupId>org.springframework.boot</groupId>
@@ -403,15 +412,9 @@
                 </plugins>
             </build>
         </profile>
-    </profiles>
-<!--    <filter>-->
-<!--        <filter-name>springSecurityFilterChain</filter-name>-->
-<!--        <filter-class>org.springframework.web.filter.DelegatingFilterProxy</filter-class>-->
-<!--    </filter>-->
 
-<!--    <filter-mapping>-->
-<!--        <filter-name>springSecurityFilterChain</filter-name>-->
-<!--        <url-pattern>/*</url-pattern>-->
-<!--    </filter-mapping>-->
+
+    </profiles>
+
 
 </project>

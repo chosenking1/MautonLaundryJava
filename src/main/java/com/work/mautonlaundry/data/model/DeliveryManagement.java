@@ -14,10 +14,11 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
+@Table
 public class DeliveryManagement {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
+    @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
     @Email

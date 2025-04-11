@@ -13,7 +13,7 @@ public interface ServiceOfferedService {
 
     ServiceRepository getRepository();
 
-    ViewServiceResponse findServiceById(Long id);
+    ViewServiceResponse getServiceById(Long id);
 
     UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request);
 

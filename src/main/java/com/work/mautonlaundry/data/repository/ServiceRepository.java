@@ -13,6 +13,8 @@ public interface ServiceRepository extends JpaRepository<Services, Long> {
         @Query("SELECT s FROM Services s WHERE s.service_name = :name")
         Optional<Services> findServicesByService_name(@Param("name") String name);
 
+    @Query("select (count(s) > 0) from Services s")
+    boolean existsByServiceName(String service);
 
 
 //    Optional<Services> findServicesByService_name(String service);

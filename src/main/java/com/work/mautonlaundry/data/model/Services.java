@@ -15,11 +15,11 @@ import lombok.Setter;
 public class Services {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
+    @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
 
-    @Column(unique = true, name = "",nullable = false)
+    @Column(unique = true,nullable = false)
     private String service_name;
 
     @Column(nullable = false)
@@ -29,6 +29,7 @@ public class Services {
     private String service_details;
 
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private ServiceType type_of_service;
 
     @Column(nullable = false)
@@ -40,7 +41,7 @@ public class Services {
     @Column(nullable = false, length = 100)
     private String photos;
 
-    @Column
-    private Boolean deleted;
+    @Column(nullable = false)
+    private Boolean deleted = false;
 
 }

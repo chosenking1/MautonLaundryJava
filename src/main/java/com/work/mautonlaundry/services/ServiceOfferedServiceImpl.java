@@ -9,20 +9,20 @@ import com.work.mautonlaundry.dtos.responses.serviceresponse.UpdateServiceRespon
 import com.work.mautonlaundry.dtos.responses.serviceresponse.ViewServiceResponse;
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceAlreadyExistException;
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
-import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.modelmapper.ModelMapper;
 
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
 @Service
 public class ServiceOfferedServiceImpl implements ServiceOfferedService{
-//    @Autowired
+    @Autowired
     private final ServiceRepository serviceRepository ;
 
-    ModelMapper mapper = new ModelMapper();
+    @Autowired
+    private  ModelMapper mapper;
 
     public ServiceOfferedServiceImpl(ServiceRepository serviceRepository) {
         this.serviceRepository = serviceRepository;
@@ -40,8 +40,8 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
         else{
             service.setService_name(request.getService_name());
             service.setType_of_service(request.getType_of_service());
-            service.setPhotos(request.getPhotos());
             service.setService_details(request.getService_details());
+            service.setService_category(request.getService_category());
             service.setPhotos(request.getPhotos());
             service.setService_price(request.getService_price());
             service.setService_price_white(request.getService_price_white());
@@ -52,29 +52,33 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
     }
 
     private boolean serviceExist(Long id) {
-        return findServiceById(id) != null;
+        return serviceRepository.existsById(id);
     }
 
     private boolean serviceExist(String service) {
-        return findServiceByServiceName(service) != null;
+        return serviceRepository.existsByServiceName(service);
     }
 
-    private Services findServiceByServiceName(String service) {
-        ViewServiceResponse response = new ViewServiceResponse();
-//        Optional<Services> services = Optional.ofNullable(serviceRepository.findByService_name(service).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
-//        mapper.map(services, response);
-//        return response;
-        return serviceRepository.findServicesByService_name(service).orElseThrow(()-> new UsernameNotFoundException("user name not found"));
-
+    private Services findServiceByServiceName(String serviceName) {
+        return serviceRepository.findServicesByService_name(serviceName)
+                .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
     }
+
+
+    private Services findServiceById(Long id) {
+        return serviceRepository.findById(id)
+                .orElseThrow(() -> new ServiceNotFoundException("Service doesn't exist"));
+    }
+
 
     @Override
-    public ViewServiceResponse findServiceById(Long id) {
+    public ViewServiceResponse getServiceById(Long id) {
         ViewServiceResponse response = new ViewServiceResponse();
-        Optional<Services> services = Optional.ofNullable(serviceRepository.findById(id).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
+        Optional<Services> services = Optional.ofNullable(serviceRepository.findById(id).orElseThrow(() -> new ServiceNotFoundException("Service Doesnt Exist")));
         mapper.map(services, response);
         return response;
     }
+
     @Override
     public ServiceRepository getRepository() {
         return serviceRepository;
@@ -84,26 +88,20 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
 
     @Override
     public UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request) {
-        Services existingService = new Services();
-        UpdateServiceResponse updateResponse = new UpdateServiceResponse();
-
-        if(serviceExist(request.getId())) {
-            mapper.map(request, existingService);
-            serviceRepository.save(existingService);
-            String message = "Details Updated Successfully";
-            mapper.map(message, updateResponse);
-            return updateResponse;
-        }
-        else{
-
-            throw new ServiceNotFoundException("Service Not Found");
-
-        }
+        Services existingService = findServiceById(request.getId());
+        mapper.map(request, existingService);
+        Services updatedService = serviceRepository.save(existingService);
+        return mapper.map(updatedService, UpdateServiceResponse.class);
     }
+
 
     @Override
     public void deleteService(Long id) {
+        if (!serviceExist(id)) {
+            throw new ServiceNotFoundException("Service not found");
+        }
         serviceRepository.deleteById(id);
     }
+
 
 }

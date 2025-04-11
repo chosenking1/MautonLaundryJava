@@ -32,7 +32,7 @@ public class ServicesController {
 
     @GetMapping("/viewService/{id}")
     public ViewServiceResponse viewService(@PathVariable("id") Long id){
-        return serviceOffered.findServiceById(id);
+        return serviceOffered.getServiceById(id);
     }
 
     @GetMapping("/viewAllServices")
