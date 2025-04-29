@@ -27,6 +27,7 @@ public class AuthController {
         String token = null;
         try {
             token = authService.login(loginDto);
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
