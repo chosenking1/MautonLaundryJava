@@ -11,6 +11,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -22,6 +23,7 @@ public class DeliveryController {
     @Autowired
     private DeliveryManagementService deliveryService;
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
     @PostMapping("/registerPickup")
     public PickupResponse registerPickup(@RequestBody PickupRequest request){
         return deliveryService.createPickup(request);
@@ -33,18 +35,21 @@ public class DeliveryController {
         return deliveryService.findPickupById(id);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
     @GetMapping("/viewAllDelivery")
     public Collection<DeliveryManagement> viewAllDelivery() {
 
         return deliveryService.getRepository().findAll();
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
     @PutMapping("/updateDelivery")
     public PickupStatusUpdateResponse updatePickupStatus(@RequestBody PickupStatusUpdateRequest request)
     {
         return deliveryService.pickupUpdate(request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/delivery/{id}")
     public ResponseEntity<?> deleteDelivery(@PathVariable("id") Long id) {
         try {

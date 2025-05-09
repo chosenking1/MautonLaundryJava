@@ -21,10 +21,12 @@ public class BookingController {
     @Autowired
     private BookingService bookingService;
 
+
     @PostMapping("/registerBooking")
     public RegisterBookingResponse registerBooking(@RequestBody RegisterBookingRequest request){
         return bookingService.RegisterBooking(request);
     }
+
 
     @GetMapping("/viewBooking/{id}")
     public ViewBookingResponse viewBooking(@PathVariable("id") Long id){
