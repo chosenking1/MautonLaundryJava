@@ -74,8 +74,8 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService{
     @Override
     public ViewServiceResponse getServiceById(Long id) {
         ViewServiceResponse response = new ViewServiceResponse();
-        Optional<Services> services = Optional.ofNullable(serviceRepository.findById(id).orElseThrow(() -> new ServiceNotFoundException("Service Doesnt Exist")));
-        mapper.map(services, response);
+        Services service = findServiceById(id);
+        mapper.map(service, response);
         return response;
     }
 

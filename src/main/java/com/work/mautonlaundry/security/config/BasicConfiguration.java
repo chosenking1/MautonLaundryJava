@@ -52,6 +52,7 @@ public class BasicConfiguration{
 
                         .requestMatchers("/api/auth/login", "/register", "/v1/api/**", "/v2/api-docs", "/v3/api-docs", "/v3/api-docs/**", "/swagger-resources", "/swagger-resources/**", "/configuration/ui", "/configuration/security", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/admin").hasRole("ADMIN")
+                                .requestMatchers(HttpMethod.PUT,"/updateService").hasRole("ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")

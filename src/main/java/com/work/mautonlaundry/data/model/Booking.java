@@ -33,8 +33,6 @@ public class Booking {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String service = "[]";
 
-
-
     @Column(nullable = false)
     private LocalDateTime date_booked;
 

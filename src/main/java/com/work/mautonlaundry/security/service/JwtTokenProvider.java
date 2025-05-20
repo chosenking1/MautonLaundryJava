@@ -16,13 +16,13 @@ import java.util.Date;
 public class JwtTokenProvider {
 
     @Value("${app.jwt-secret}")
-    private String jwtSecret; // Removed static modifier
+    private String jwtSecret;
 
     @Value("${app.jwt-expiration-milliseconds}")
-    private long jwtExpirationDate; // Removed static modifier
+    private long jwtExpirationDate;
 
     // Generate JWT token
-    public String generateToken(Authentication authentication) { // Removed static modifier
+    public String generateToken(Authentication authentication) {
         String username = authentication.getName();
         Date currentDate = new Date();
         Date expireDate = new Date(currentDate.getTime() + jwtExpirationDate);

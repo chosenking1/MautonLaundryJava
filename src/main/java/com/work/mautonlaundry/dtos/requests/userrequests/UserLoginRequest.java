@@ -7,7 +7,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-@NoArgsConstructor
+//@NoArgsConstructor
 @AllArgsConstructor
 public class UserLoginRequest {
     private String email;

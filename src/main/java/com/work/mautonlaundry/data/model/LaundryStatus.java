@@ -1,5 +1,8 @@
 package com.work.mautonlaundry.data.model;
 
+import lombok.Getter;
+
+@Getter
 public enum LaundryStatus {
     PENDING("Pending"),
     WASHING("Washing"),
@@ -13,8 +16,4 @@ public enum LaundryStatus {
     }
 
 
-
-    public String getDisplayName() {
-        return displayName;
-    }
 }

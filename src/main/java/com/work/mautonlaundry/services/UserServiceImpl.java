@@ -112,8 +112,7 @@ ModelMapper mapper = new ModelMapper();
     }
 
     private String setPassword(String password) {
-//        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-//        return passwordEncoder.encode(password);
+
       return BCrypt.hashpw(password, BCrypt.gensalt());
 
     }
@@ -122,27 +121,6 @@ ModelMapper mapper = new ModelMapper();
     public void deleteUserByEmail(User user) {
         userRepository.delete(user);
     }
-
-//    @Override
-//    public UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest user) {
-//        User existingUser = new User();
-//        UpdateUserDetailResponse updateResponse = new UpdateUserDetailResponse();
-//
-//        if(userIdExist(user.getId())) {
-//
-//            existingUser.setFull_name(user.getFirstname() +" "+ user.getSecond_name());
-//            existingUser.setAddress(user.getAddress());
-//            existingUser.setPhone_number(user.getPhone_number());
-//             userRepository.save(existingUser);
-//            String message = "Details Updated Successfully";
-//            mapper.map(message, updateResponse);
-//            return updateResponse;
-//        }
-//        else{
-//
-//            throw new UserNotFoundException("User doesn't exist");
-//
-//        }
 
     @Override
     public UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest user) {

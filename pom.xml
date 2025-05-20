@@ -5,6 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
+<!--        <version>3.1.0</version>-->
         <version>3.1.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
@@ -44,12 +45,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.springframework.experimental/spring-native -->
-        <dependency>
-            <groupId>org.springframework.experimental</groupId>
-            <artifactId>spring-native</artifactId>
-            <version>0.12.0</version>
-        </dependency>
+<!--        &lt;!&ndash; https://mvnrepository.com/artifact/org.springframework.experimental/spring-native &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.experimental</groupId>-->
+<!--            <artifactId>spring-native</artifactId>-->
+<!--            <version>0.12.0</version>-->
+<!--        </dependency>-->
 
 
 
@@ -140,12 +141,6 @@
             <version>2.5.2.RELEASE</version>
         </dependency>
 
-<!--        <dependency>-->
-<!--            <groupId>javax.validation</groupId>-->
-<!--            <artifactId>validation-api</artifactId>-->
-<!--            <version>2.0.1.Final</version>-->
-<!--        </dependency>-->
-
         <dependency>
             <groupId>com.auth0</groupId>
             <artifactId>java-jwt</artifactId>
@@ -168,7 +163,7 @@
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20180130</version>
+            <version>20231013</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.graalvm.buildtools/native-maven-plugin -->
@@ -202,19 +197,7 @@
             <scope>runtime</scope>
         </dependency>
 
-<!--        &lt;!&ndash; https://mvnrepository.com/artifact/io.springfox/springfox-swagger2 &ndash;&gt;-->
-<!--        <dependency>-->
-<!--            <groupId>io.springfox</groupId>-->
-<!--            <artifactId>springfox-swagger2</artifactId>-->
-<!--            <version>3.0.0</version>-->
-<!--        </dependency>-->
 
-<!--        &lt;!&ndash; https://mvnrepository.com/artifact/io.springfox/springfox-swagger-ui &ndash;&gt;-->
-<!--        <dependency>-->
-<!--            <groupId>io.springfox</groupId>-->
-<!--            <artifactId>springfox-swagger-ui</artifactId>-->
-<!--            <version>3.0.0</version>-->
-<!--        </dependency>-->
 
         <dependency>
             <groupId>org.springdoc</groupId>
@@ -245,25 +228,7 @@
                     </image>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.springframework.experimental</groupId>
-                <artifactId>spring-aot-maven-plugin</artifactId>
-                <version>${spring-native.version}</version>
-                <executions>
-                    <execution>
-                        <id>test-generate</id>
-                        <goals>
-                            <goal>test-generate</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>generate</id>
-                        <goals>
-                            <goal>generate</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+
 
         </plugins>
     </build>
@@ -313,16 +278,11 @@
                 <dependency>
                     <groupId>jakarta.persistence</groupId>
                     <artifactId>jakarta.persistence-api</artifactId>
-                    <version>3.2.0</version>
+<!--                    <version>3.2.1</version>-->
 
                 </dependency>
 
-                <!-- https://mvnrepository.com/artifact/org.springframework.experimental/spring-aot -->
-                <dependency>
-                    <groupId>org.springframework.experimental</groupId>
-                    <artifactId>spring-aot</artifactId>
-                    <version>0.12.2</version>
-                </dependency>
+
                 <!-- https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-api -->
                 <dependency>
                     <groupId>io.jsonwebtoken</groupId>
@@ -350,24 +310,7 @@
             </dependencies>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.hibernate.orm.tooling</groupId>
-                        <artifactId>hibernate-enhance-maven-plugin</artifactId>
-                        <version>${hibernate.version}</version>
-                        <executions>
-                            <execution>
-                                <id>enhance</id>
-                                <goals>
-                                    <goal>enhance</goal>
-                                </goals>
-                                <configuration>
-                                    <enableLazyInitialization>true</enableLazyInitialization>
-                                    <enableDirtyTracking>true</enableDirtyTracking>
-                                    <enableAssociationManagement>true</enableAssociationManagement>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
+
 
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
@@ -396,18 +339,7 @@
                         </configuration>
                     </plugin>
 
-                    <plugin>
-                        <groupId>org.springframework.experimental</groupId>
-                        <artifactId>spring-aot-maven-plugin</artifactId>
-                        <version>0.12.0</version>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>generate</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
+
 
                 </plugins>
             </build>
