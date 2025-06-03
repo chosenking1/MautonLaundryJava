@@ -17,7 +17,9 @@ public interface ServiceOfferedService {
 
     UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request);
 
-    void deleteService(Long id);
+    void deleteServiceById(Long id);
+
+    void deleteServiceByName(String serviceName);
 
 
 }

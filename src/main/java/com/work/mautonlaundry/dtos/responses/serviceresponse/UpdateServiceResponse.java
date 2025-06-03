@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.dtos.responses.serviceresponse;
 
+import com.work.mautonlaundry.data.model.ServicePrice;
 import com.work.mautonlaundry.data.model.ServiceType;
 import lombok.Data;
 
@@ -12,7 +13,6 @@ public class UpdateServiceResponse {
     private String service_category;
     private String service_details;
     private ServiceType type_of_service;
-    private int service_price;
-    private int service_price_white;
+    private ServicePrice servicePrice;
     private String photos;
 }

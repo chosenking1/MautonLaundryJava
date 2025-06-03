@@ -1,13 +1,11 @@
 package com.work.mautonlaundry.dtos.requests.servicerequests;
 
 import com.work.mautonlaundry.data.model.ServiceType;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
-@Setter
-@Getter
+@Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class UpdateServiceRequest {
     private Long id;
     private String service_name;
@@ -16,5 +14,7 @@ public class UpdateServiceRequest {
     private ServiceType type_of_service;
     private int service_price;
     private int service_price_white;
+    private int locationMultiplier;
+    private int express;
     private String photos;
 }

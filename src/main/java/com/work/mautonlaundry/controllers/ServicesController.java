@@ -60,7 +60,7 @@ public class ServicesController {
 //        } catch (Exception e) {
 //            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 //        }
-        serviceOffered.deleteService(id);
+        serviceOffered.deleteServiceById(id);
         return ResponseEntity.ok().build();
     }
 

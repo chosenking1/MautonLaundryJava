@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.validation.annotation.Validated;
 
-
+import java.util.List;
 
 
 @Entity
@@ -45,4 +45,22 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserRole userRole;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private List<Address> addresses;
+
+    // Method to get the default address
+    public Address getDefaultAddress() {
+        return addresses.stream()
+                .filter(address -> address.getIsDefault() != null && address.getIsDefault())
+                .findFirst()
+                .orElseGet(() -> getMostRecentlyUsedAddress());
+    }
+    // Method to get the most recently used address
+    public Address getMostRecentlyUsedAddress() {
+        return addresses.stream()
+                .filter(address -> !address.getDeleted())
+                .max((a1, a2) -> a1.getLastUsed().compareTo(a2.getLastUsed()))
+                .orElse(null);
+    }
 }
