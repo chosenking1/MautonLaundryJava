@@ -1,70 +1,98 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.Booking;
-import com.work.mautonlaundry.data.model.LaundryStatus;
-import com.work.mautonlaundry.data.repository.BookingRepository;
+import com.work.mautonlaundry.data.model.*;
+import com.work.mautonlaundry.data.repository.*;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.RegisterBookingRequest;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.UpdateBookingRequest;
-import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupRequest;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.RegisterBookingResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.UpdateBookingResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.ViewBookingResponse;
 import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
+import jakarta.transaction.Transactional;
+
+import lombok.RequiredArgsConstructor;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.springframework.util.ObjectUtils.isEmpty;
 
 @Service
+@RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService{
     @Autowired
     private BookingRepository bookingRepository;
 
     ModelMapper mapper = new ModelMapper();
 
+    private final UserRepository userRepository;
+    private final AddressRepository addressRepository;
+    private final PaymentRepository paymentRepository;
+    private final DeliveryManagementRepository deliveryManagementRepository;
+
     @Override
-    public RegisterBookingResponse RegisterBooking(RegisterBookingRequest request) {
+    @Transactional
+    public RegisterBookingResponse registerBooking(RegisterBookingRequest request) {
+        // Get user
+        User user = userRepository.findUserById(request.getUserId())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        // Create booking
         Booking booking = new Booking();
-        DeliveryManagementService deliveryManagementService = new DeliveryManagementServiceImpl();
-        RegisterBookingResponse registerBookingResponse = new RegisterBookingResponse();
-        PickupRequest pickupRequest = new PickupRequest();
+        booking.setUser(user);
+        booking.setDate_booked(LocalDateTime.now());
+        booking.setLaundryStatus(LaundryStatus.PENDING);
+        booking.setUrgency(request.getUrgency());
 
-//        if(userExist(request.getEmail())) {
-//            throw new UserAlreadyExistsException("Email already exist");
-//        }
-//        else{
-            booking.setFull_name(request.getFull_name());
-            booking.setAddress(request.getAddress());
-            booking.setEmail(request.getEmail());
-            booking.setType_of_service(request.getType_of_service());
-            booking.setService(String.valueOf(request.getService()));
-            booking.setUrgency(request.getUrgency());
-            booking.setDate_booked(request.getDate_booked());
-            booking.setTotal_price(totalPriceCalculation(request.getService()));
-            booking.setLaundryStatus(LaundryStatus.PENDING);
-            Booking bookingDetails = bookingRepository.save(booking);
+        // Save booking
+        Booking savedBooking = bookingRepository.save(booking);
 
-            mapper.map(bookingDetails, pickupRequest);
-            deliveryManagementService.createPickup(pickupRequest);
-            mapper.map(bookingDetails, registerBookingResponse);
-//    }
+        // Create payment record
+        Payment payment = createPayment(savedBooking, request);
+        booking.setPayment(payment);
 
-        return registerBookingResponse;
+        // Setup delivery
+//        createDeliveryManagement(request.getAddressId(), request);
+
+        return mapper.map(savedBooking, RegisterBookingResponse.class);
     }
 
-    private Double totalPriceCalculation(JSONArray service) {
-        double totalPrice = 0.0;
+    private Payment createPayment(Booking method, RegisterBookingRequest booking) {
+        Payment payment = new Payment();
+        payment.setPaymentMethod(PaymentMethod.TRANSFER);
+        payment.setAmount(totalPriceCalculation(booking.getService()));
+        payment.setStatus(PaymentStatus.PENDING);
+
+        payment.setBooking(method);
+//        payment.setUser(booking.getUser());
+        return paymentRepository.save(payment);
+    }
+
+    private void createDeliveryManagement(Long addressId, Booking booking) {
+//        Address address = addressRepository.findById(addressId)
+//                .orElseThrow(() -> new AddressNotFoundException("Address not found"));
+
+        DeliveryManagement delivery = new DeliveryManagement();
+        delivery.setBooking_id(booking.getId());
+        delivery.setAddress(booking.getUser().getAddress());
+        delivery.setDeliveryStatus(DeliveryStatus.PENDING_PICKUP);
+        deliveryManagementRepository.save(delivery);
+    }
+
+    private BigDecimal totalPriceCalculation(JSONArray service) {
+        BigDecimal totalPrice = BigDecimal.valueOf(00.00);
         for (int i = 0; i < service.length(); i++) {
             JSONObject services = service.getJSONObject(i);
-            double price = services.getDouble("price");
-            totalPrice += price;
+            BigDecimal price = BigDecimal.valueOf(services.getDouble("price"));
+            totalPrice = totalPrice.add(price);
         }
         return totalPrice;
     }

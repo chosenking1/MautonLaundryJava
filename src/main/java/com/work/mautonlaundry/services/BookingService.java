@@ -8,7 +8,7 @@ import com.work.mautonlaundry.dtos.responses.bookingresponse.UpdateBookingRespon
 import com.work.mautonlaundry.dtos.responses.bookingresponse.ViewBookingResponse;
 
 public interface BookingService {
-    RegisterBookingResponse RegisterBooking(RegisterBookingRequest request);
+    RegisterBookingResponse registerBooking(RegisterBookingRequest request);
 
     BookingRepository getRepository();
 

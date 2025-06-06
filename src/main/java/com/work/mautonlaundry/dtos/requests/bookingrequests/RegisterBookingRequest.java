@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.dtos.requests.bookingrequests;
 
+import com.work.mautonlaundry.data.model.Payment;
 import com.work.mautonlaundry.data.model.ServiceType;
 import com.work.mautonlaundry.data.model.UrgencyType;
 import lombok.AllArgsConstructor;
@@ -14,7 +15,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class RegisterBookingRequest {
 
-    private String full_name;
+    private String UserId;
 
     private String email;
 
@@ -27,5 +28,7 @@ public class RegisterBookingRequest {
     private String address;
 
     private UrgencyType urgency;
+
+
 
 }

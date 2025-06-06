@@ -18,14 +18,6 @@ public class Booking {
     @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
-
-    @Column
-    private String full_name;
-
-    @Email
-    @Column
-    private String email;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ServiceType type_of_service;
@@ -36,9 +28,6 @@ public class Booking {
     @Column(nullable = false)
     private LocalDateTime date_booked;
 
-    @Column(nullable = false)
-    private String address;
-
     @Enumerated(EnumType.STRING)
     @Column
     private UrgencyType urgency;
@@ -47,8 +36,15 @@ public class Booking {
     @Column(nullable = false)
     private LaundryStatus laundryStatus;
 
-    @Column(nullable = false)
-    private Double total_price;
+     @ManyToOne(fetch = FetchType.LAZY)
+     @JoinColumn(name = "user_id")
+     private User user;
+
+    @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL)
+    private Payment payment;
+
+//    @Column(nullable = false)
+//    private Double total_price;
 
     @Column
     private Boolean deleted;

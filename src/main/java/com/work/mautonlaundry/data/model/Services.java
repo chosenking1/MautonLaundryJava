@@ -39,7 +39,7 @@ public class Services {
     @Column(nullable = false)
     private Boolean deleted = false;
 
-    @OneToOne(mappedBy = "service", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "service", cascade = CascadeType.ALL)
     private ServicePrice servicePrice;
 
 }
