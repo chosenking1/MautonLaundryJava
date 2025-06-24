@@ -22,7 +22,7 @@ public class DeliveryManagement {
     private Long id;
 
     @Column(nullable = false)
-    private Long booking_id;
+    private Long bookingId;
 
     @Column(nullable = false)
     private LocalDateTime pick_up_date;

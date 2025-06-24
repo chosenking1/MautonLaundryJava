@@ -48,7 +48,7 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
 
         deliveryManagement.setUserAddress(request.getUserAddress());
 //        deliveryManagement.setEmail(request.getEmail());
-        deliveryManagement.setBooking_id(request.getBooking_id());
+        deliveryManagement.setBookingId(request.getBooking_id());
         deliveryManagement.setPick_up_date(calculatePickUpDate(request.getDate_booked()));
         deliveryManagement.setUserAddress(request.getUserAddress());
         deliveryManagement.setUrgency(request.getUrgency());
@@ -105,13 +105,13 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
     }
 
     /**
-     * @param email
+     * @param bookingId
      * @return
      */
     @Override
-    public PickupStatusResponse findPickupByEmail(String email) {
+    public PickupStatusResponse findDeliveryByBookingId(Long bookingId) {
         PickupStatusResponse response = new PickupStatusResponse();
-        Optional<DeliveryManagement> deliveryManagement = Optional.of(deliveryRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException("Delivery Doesnt Exist")));
+        Optional<DeliveryManagement> deliveryManagement = Optional.of(deliveryRepository.findByBookingId(bookingId).orElseThrow(() -> new UserNotFoundException("Delivery Doesnt Exist")));
         mapper.map(deliveryManagement, response);
         return response;
 
@@ -150,16 +150,20 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
      */
     @Override
     public void deletePickup(Long id) {
+        if (!deliveryExist(id)) {
+            throw new BookingNotFoundException("Delivery not found with id: " + id);
+        }
         deliveryRepository.deleteById(id);
     }
 
-    /**
-     * @param email
-     */
     @Override
-    public void deletePickup(String email) {
-        deliveryRepository.deleteByEmail(email);
+    public void deletePickupByBookingId(Long bookingId) {
+        if (!deliveryExist(bookingId)) {
+            throw new BookingNotFoundException("Delivery not found with id: " + bookingId);
+        }
+        deliveryRepository.deleteByBookingId(bookingId);
     }
+
 
     @Override
     public void setLaundryManAddress(Long deliveryId, Long bookingId) {

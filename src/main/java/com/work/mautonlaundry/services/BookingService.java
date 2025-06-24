@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.services;
 
+import com.work.mautonlaundry.data.model.User;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.RegisterBookingRequest;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.UpdateBookingRequest;
@@ -18,6 +19,6 @@ public interface BookingService {
     UpdateBookingResponse bookingDetailsUpdate(UpdateBookingRequest request);
 
     void deleteBooking(Long id);
-    void deleteBooking(String email);
+    void deleteBooking(User user);
 
 }

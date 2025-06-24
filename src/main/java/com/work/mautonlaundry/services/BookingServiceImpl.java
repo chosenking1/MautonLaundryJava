@@ -48,10 +48,9 @@ public class BookingServiceImpl implements BookingService{
     ModelMapper mapper = new ModelMapper();
 
     private final UserRepository userRepository;
-    private final AddressRepository addressRepository;
+
 
     private final ServiceRepository serviceRepository;
-    private final DeliveryManagementRepository deliveryManagementRepository;
 
     @Override
     @Transactional
@@ -192,7 +191,7 @@ public class BookingServiceImpl implements BookingService{
     @Override
     public ViewBookingResponse findBookingByEmail(String email) {
         ViewBookingResponse response = new ViewBookingResponse();
-        Optional<Booking> bookings = Optional.of(bookingRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
+        Optional<Booking> bookings = Optional.of(bookingRepository.findByUser_Email(email).orElseThrow(() -> new UserNotFoundException("Service Doesnt Exist")));
         mapper.map(bookings, response);
         return response;
     }
@@ -226,7 +225,7 @@ public class BookingServiceImpl implements BookingService{
     }
 
     @Override
-    public void deleteBooking(String email) {
-        bookingRepository.deleteByEmail(email);
+    public void deleteBooking(User user) {
+        bookingRepository.deleteByUser(user);
     }
 }

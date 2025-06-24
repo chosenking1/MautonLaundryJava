@@ -13,12 +13,12 @@ public interface DeliveryManagementService {
     DeliveryManagementRepository getRepository();
 
     PickupStatusResponse findPickupById(Long id);
-    PickupStatusResponse findPickupByEmail(String email);
+    PickupStatusResponse findDeliveryByBookingId(Long bookingId);
 
     PickupStatusUpdateResponse pickupUpdate(PickupStatusUpdateRequest request);
 
     void deletePickup(Long id);
-    void deletePickup(String Email);
+    void deletePickupByBookingId(Long bookingId);
 
     void setLaundryManAddress(Long id, Long bookingId);
 }
