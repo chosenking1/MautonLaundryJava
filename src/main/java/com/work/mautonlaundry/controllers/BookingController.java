@@ -24,7 +24,7 @@ public class BookingController {
 
     @PostMapping("/registerBooking")
     public RegisterBookingResponse registerBooking(@RequestBody RegisterBookingRequest request){
-        return bookingService.RegisterBooking(request);
+        return bookingService.registerBooking(request);
     }
 
 
