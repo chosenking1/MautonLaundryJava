@@ -22,5 +22,8 @@ public class BookingResource {
     private String laundryAgentId;
 
     @Column()
-    private String deliveryAgentId ;
+    private String pickupAgentId ;
+
+    @Column()
+    private String returnAgentId ;
 }

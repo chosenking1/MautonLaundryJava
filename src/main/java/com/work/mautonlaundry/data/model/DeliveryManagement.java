@@ -21,30 +21,28 @@ public class DeliveryManagement {
     @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
-    @Email
-    @Column(unique = true)
-    private String email;
-
     @Column(nullable = false)
     private Long booking_id;
 
-    @Column
-    private LocalDateTime pick_up;
+    @Column(nullable = false)
+    private LocalDateTime pick_up_date;
 
-    @Column
+    @Column(nullable = false)
     private LocalDateTime return_date;
 
     @Column(nullable = false)
-    private String address;
+    private String userAddress;
+
+    private String agentAddress;
 
     @Enumerated(EnumType.STRING)
-    @Column
+    @Column(nullable = false)
     private UrgencyType urgency;
 
     @Enumerated(EnumType.STRING)
-    @Column
+    @Column(nullable = false)
     private DeliveryStatus deliveryStatus;
 
-    @Column
-    private Boolean deleted;
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private Boolean deleted = false;
 }

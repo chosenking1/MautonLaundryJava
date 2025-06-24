@@ -1,12 +1,10 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.DeliveryManagement;
-import com.work.mautonlaundry.data.model.DeliveryStatus;
-import com.work.mautonlaundry.data.model.UrgencyType;
-import com.work.mautonlaundry.data.repository.DeliveryManagementRepository;
-import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupRequest;
+import com.work.mautonlaundry.data.model.*;
+import com.work.mautonlaundry.data.repository.*;
+import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.DeliveryRequest;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupStatusUpdateRequest;
-import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupResponse;
+import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.CreateDeliveryResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusUpdateResponse;
 import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
@@ -25,32 +23,51 @@ import static org.springframework.util.ObjectUtils.isEmpty;
 public class DeliveryManagementServiceImpl implements DeliveryManagementService{
     @Autowired
     private DeliveryManagementRepository deliveryRepository;
+
     ModelMapper mapper = new ModelMapper();
+
+    @Autowired
+    BookingRepository bookingRepository;
+
+    BookingResourceRepository bookingResourceRepository;
+
+    AddressRepository addressRepository;
+
+    UserRepository userRepository;
 
     /**
      * @param request a pickup
      * @return a string
      */
     @Override
-    public PickupResponse createPickup(PickupRequest request) {
+    public CreateDeliveryResponse createDeliveryDetails(DeliveryRequest request) {
         DeliveryManagement deliveryManagement = new DeliveryManagement();
-        PickupResponse pickupResponse = new PickupResponse();
+        if (request == null) {
+            throw new IllegalArgumentException("Delivery request must not be null.");
+        }
 
-        deliveryManagement.setAddress(request.getAddress());
-        deliveryManagement.setEmail(request.getEmail());
-        deliveryManagement.setBooking_id(request.getId());
-        deliveryManagement.setPick_up(calculatePickUpDate(request.getDate_booked()));
+        deliveryManagement.setUserAddress(request.getUserAddress());
+//        deliveryManagement.setEmail(request.getEmail());
+        deliveryManagement.setBooking_id(request.getBooking_id());
+        deliveryManagement.setPick_up_date(calculatePickUpDate(request.getDate_booked()));
+        deliveryManagement.setUserAddress(request.getUserAddress());
         deliveryManagement.setUrgency(request.getUrgency());
         deliveryManagement.setDeliveryStatus(DeliveryStatus.PENDING_PICKUP);
-        deliveryManagement.setReturn_date(calculateReturnDate(deliveryManagement.getPick_up(), request.getUrgency()));
-
-        DeliveryManagement bookingDetails = deliveryRepository.save(deliveryManagement);
-
-        mapper.map(bookingDetails, pickupResponse);
-        return pickupResponse;
+        deliveryManagement.setPick_up_date(calculatePickUpDate(request.getDate_booked()));
+        deliveryManagement.setReturn_date(calculateReturnDate(deliveryManagement.getPick_up_date(), request.getUrgency()));
+        
+        DeliveryManagement savedDelivery = deliveryRepository.save(deliveryManagement);
+        CreateDeliveryResponse response = mapper.map(savedDelivery, CreateDeliveryResponse.class);
+        response.setMessage("Delivery details created successfully");
+        return response;
     }
 
     private LocalDateTime calculateReturnDate(LocalDateTime pick_up, UrgencyType urgency) {
+        // Calculate return date based on urgency type
+        // Normal urgency returns in 7 days, urgent urgency returns in 3 days
+        if (pick_up == null || urgency == null) {
+            throw new IllegalArgumentException("Pick-up date and urgency type must not be null.");
+        }
         LocalDateTime returnDate;
         if (urgency == UrgencyType.NORMAL){
             returnDate = pick_up.plusDays(7);
@@ -142,5 +159,28 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
     @Override
     public void deletePickup(String email) {
         deliveryRepository.deleteByEmail(email);
+    }
+
+    @Override
+    public void setLaundryManAddress(Long deliveryId, Long bookingId) {
+        DeliveryManagement delivery = deliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new BookingNotFoundException("Delivery not found with id: " + deliveryId));
+
+        Booking booking = bookingRepository.findBookingById(bookingId);
+        if (booking == null || booking.getDeleted()== true) {
+            throw new BookingNotFoundException("Booking not found with id: " + bookingId);
+        }
+        Optional<BookingResource> bookingResource = Optional.ofNullable(bookingResourceRepository.findByBookingId(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking resource not found for booking id: " + bookingId)));
+
+        if(booking.getType_of_service() == ServiceType.LAUNDRY) {
+            User agent = userRepository.findUserById(bookingResource.get().getLaundryAgentId())
+                    .orElseThrow(() -> new UserNotFoundException("Agent not found with id: " + bookingResource.get().getLaundryAgentId()));
+            delivery.setAgentAddress(agent.getMostRecentlyUsedAddress().getId());
+            deliveryRepository.save(delivery);
+        }
+        else {
+            throw new ServiceNotFoundException("Service type not supported for delivery management.");
+        }
     }
 }

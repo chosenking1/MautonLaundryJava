@@ -10,4 +10,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findByEmail(String email);
     Optional<Booking> deleteByEmail(String email);
 
+    Booking findBookingById(Long id);
 }

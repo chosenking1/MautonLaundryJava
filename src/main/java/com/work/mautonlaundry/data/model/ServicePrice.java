@@ -21,7 +21,7 @@ public class ServicePrice {
 
     private int locationMultiplier;
 
-    private int express;
+//    private int express;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_id")

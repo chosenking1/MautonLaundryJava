@@ -110,7 +110,6 @@ public AddServiceResponse addService(AddServiceRequest request) {
         ServicePrice existingPrice = servicePriceRepository.findServicePriceByService(existingService);
 
         existingPrice.setWhite(request.getService_price_white());
-        existingPrice.setExpress(request.getExpress());
         existingPrice.setPrice(request.getService_price());
         existingPrice.setLocationMultiplier(existingPrice.getLocationMultiplier());
 

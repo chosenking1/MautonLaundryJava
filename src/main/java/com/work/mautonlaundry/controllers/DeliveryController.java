@@ -1,9 +1,9 @@
 package com.work.mautonlaundry.controllers;
 
 import com.work.mautonlaundry.data.model.DeliveryManagement;
-import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupRequest;
+import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.DeliveryRequest;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupStatusUpdateRequest;
-import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupResponse;
+import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.CreateDeliveryResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusUpdateResponse;
 import com.work.mautonlaundry.services.DeliveryManagementService;
@@ -25,8 +25,21 @@ public class DeliveryController {
 
     @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
     @PostMapping("/registerPickup")
-    public PickupResponse registerPickup(@RequestBody PickupRequest request){
-        return deliveryService.createPickup(request);
+    public CreateDeliveryResponse registerPickup(@RequestBody DeliveryRequest request){
+        return deliveryService.createDeliveryDetails(request);
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
+    @PostMapping("/set-laundry-agent-address/{id}")
+    public ResponseEntity<?> setLaundryAgentAddress(@PathVariable("id") Long id, @RequestParam Long agentAddress) {
+        try {
+            deliveryService.setLaundryManAddress(id, agentAddress);
+            return ResponseEntity.ok("Laundry agent address updated successfully.");
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/viewDeliveryStatus/{id}")
@@ -61,4 +74,5 @@ public class DeliveryController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
 }

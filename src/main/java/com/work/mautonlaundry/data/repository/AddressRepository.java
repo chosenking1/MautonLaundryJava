@@ -13,6 +13,7 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
     Optional<Address> findAddressById (String id);
     List<Address> findAllByUser(User user);
     Optional<Address> findByUserAndIsDefaultTrue(User user);
+
     Optional<Address> findTopByUserAndDeletedFalseOrderByLastUsedDesc(User user);
     Optional<Address> findTopByUserAndDeletedFalseOrderByModifiedAtDesc(User user);
     Optional<Address> findTopByUserAndDeletedFalseOrderByCreatedAtDesc(User user);

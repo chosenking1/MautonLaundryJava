@@ -11,15 +11,18 @@ import java.time.LocalDateTime;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
-public class PickupRequest {
+public class DeliveryRequest {
 
-    private String email;
-
-    private Long id;
+//    private String email;
 
     private LocalDateTime date_booked;
 
-    private String address;
+    private String userAddress;
+
+    private String agentAddress;
 
     private UrgencyType urgency;
+
+    private Long booking_id;
+
 }

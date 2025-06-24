@@ -10,5 +10,6 @@ public interface BookingResourceRepository {
     Optional<BookingResource> findByBookingId(Long bookingId);
     Optional<BookingResource> findByLaundryAgentId(String laundryAgentId);
 
-    Optional <BookingResource>findByDeliveryAgentId(String deliveryAgentId);
+    Optional <BookingResource>findByPickupDeliveryAgentId(String deliveryAgentId);
+    Optional <BookingResource>findByReturnDeliveryAgentId(String deliveryAgentId);
 }

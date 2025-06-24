@@ -16,7 +16,9 @@ public interface ServiceRepository extends JpaRepository<Services, Long> {
     @Query("select (count(s) > 0) from Services s")
     boolean existsByServiceName(String service);
 
-    Optional<Services> findServicesById(Long id);
+//    Services findServicesById(Long id);
+
+    Optional<Services>  findServicesById(Long id);
 
 
 //    Optional<Services> findServicesByService_name(String service);

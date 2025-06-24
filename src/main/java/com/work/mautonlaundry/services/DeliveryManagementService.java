@@ -1,14 +1,14 @@
 package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.repository.DeliveryManagementRepository;
-import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupRequest;
+import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.DeliveryRequest;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupStatusUpdateRequest;
-import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupResponse;
+import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.CreateDeliveryResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusResponse;
 import com.work.mautonlaundry.dtos.responses.deliverymanagementresponse.PickupStatusUpdateResponse;
 
 public interface DeliveryManagementService {
-    PickupResponse createPickup(PickupRequest request);
+    CreateDeliveryResponse createDeliveryDetails(DeliveryRequest request);
 
     DeliveryManagementRepository getRepository();
 
@@ -19,4 +19,6 @@ public interface DeliveryManagementService {
 
     void deletePickup(Long id);
     void deletePickup(String Email);
+
+    void setLaundryManAddress(Long id, Long bookingId);
 }
