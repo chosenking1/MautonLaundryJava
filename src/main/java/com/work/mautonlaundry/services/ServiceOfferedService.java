@@ -1,6 +1,5 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.Services;
 import com.work.mautonlaundry.data.repository.ServiceRepository;
 import com.work.mautonlaundry.dtos.requests.servicerequests.AddServiceRequest;
 import com.work.mautonlaundry.dtos.requests.servicerequests.UpdateServiceRequest;
