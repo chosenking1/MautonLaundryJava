@@ -4,7 +4,7 @@ import com.work.mautonlaundry.data.model.ServicePrice;
 import com.work.mautonlaundry.data.model.ServiceType;
 import lombok.Data;
 
-import java.math.BigDecimal;
+
 
 @Data
 public class UpdateServiceResponse {

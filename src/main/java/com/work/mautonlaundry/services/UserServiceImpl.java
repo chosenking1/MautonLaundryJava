@@ -69,7 +69,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         User user = new User();
         RegisterUserResponse registerResponse = new RegisterUserResponse();
 
-        if(userEmailExist(request.getEmail())) {
+        if(userRepository.existsByEmail(request.getEmail())) {
             throw new UserAlreadyExistsException("Email already exist");
         }
         else{
@@ -81,7 +81,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         user.setPhone_number(request.getPhone_number());
         User userDetails = userRepository.save(user);
 
-        mapper.map(userDetails, registerResponse);}
+//        mapper.map(userDetails, registerResponse);
+            registerResponse.setEmail(userDetails.getEmail());
+        }
 
         return registerResponse;
     }

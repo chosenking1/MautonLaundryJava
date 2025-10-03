@@ -22,6 +22,7 @@ public interface UserService {
     FindUserResponse findUserByEmail(String userEmail);
 
 
+
     FindUserResponse findUserById(String id);
 
     void deleteUserByEmail(String email);

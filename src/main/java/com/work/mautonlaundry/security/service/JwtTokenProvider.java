@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import io.jsonwebtoken.security.Keys;
 
 
+import javax.crypto.SecretKey;
 import java.security.Key;
 import java.util.Date;
 
@@ -28,16 +29,14 @@ public class JwtTokenProvider {
         Date expireDate = new Date(currentDate.getTime() + jwtExpirationDate);
 
         return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(currentDate)
-                .setExpiration(expireDate)
+                .subject(username)
+                .issuedAt(currentDate)
+                .expiration(expireDate)
                 .signWith(key())
                 .compact();
     }
 
-//    private Key key() {
-//        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
-//    }
+
 
     private Key key() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
@@ -47,19 +46,19 @@ public class JwtTokenProvider {
     // Get username from JWT token
     public String getUsername(String token) {
         return Jwts.parser()
-                .setSigningKey(key()) // Changed verifyWith to setSigningKey
+                .verifyWith((SecretKey) key()) // Changed verifyWith to setSigningKey
                 .build()
-                .parseClaimsJws(token) // Use parseClaimsJws instead of parseSignedClaims
-                .getBody()
+                .parseSignedClaims(token) // Use parseClaimsJws instead of parseSignedClaims
+                .getPayload()
                 .getSubject();
     }
 
     // Validate JWT token
     public boolean validateToken(String token) {
         Jwts.parser()
-                .setSigningKey(key()) // Changed verifyWith to setSigningKey
+                .verifyWith((SecretKey) key()) // Changed verifyWith to setSigningKey
                 .build()
-                .parseClaimsJws(token); // Use parseClaimsJws instead of parse
+                .parseSignedClaims(token); // Use parseClaimsJws instead of parse
         return true;
     }
 }
