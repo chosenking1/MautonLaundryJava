@@ -1,96 +1,106 @@
 # MautonLaundry - Spring Boot Application
 
-## Project Description
-MautonLaundry is a comprehensive Spring Boot application designed to manage all aspects of a laundry service business. It provides robust functionalities for user management, laundry order processing, delivery management, and payment handling. The application follows modern software architecture principles and implements best practices in security and data management.
+A comprehensive laundry service management system built with Spring Boot, providing complete business operations from user registration to payment processing.
 
-## Key Features
-- **User Management**
-  - User registration and authentication with JWT
-  - Role-based access control (Admin, User, Laundry Agent, Delivery Agent)
-  - User profile management and address handling
-  - Soft delete functionality for users
+## Features
 
-- **Booking Management**
-  - Laundry service booking with multiple service options
-  - Urgency level selection (Standard, Express)
-  - Booking status tracking (Pending, Washing, Ready for Pickup, Delivered)
-  - Booking history management
-  - Cancellation and refund processing
+### Core Functionality
+- **User Management**: Registration, authentication, role-based access (Admin, User, Laundry Agent, Delivery Agent)
+- **Booking System**: Service booking with urgency levels, status tracking, cancellation/refunds
+- **Delivery Management**: Address handling, geolocation, delivery tracking
+- **Payment Processing**: Multiple payment methods, transaction history
+- **Security**: JWT authentication, password encryption, role-based authorization
 
-- **Delivery Management**
-  - Delivery address management with geolocation
-  - Delivery status tracking (Pending Pickup, In Transit, Delivered)
-  - Integration with delivery agents
+### Technical Features
+- RESTful API with Swagger documentation
+- Soft delete functionality
+- Transaction management
+- Input validation
+- Audit logging capabilities
 
-- **Payment Processing**
-  - Multiple payment methods (Card, Cash, Transfer)
-  - Payment status tracking (Pending, Success, Failed, Refunded)
-  - Transaction history
+## Tech Stack
 
-- **Security Features**
-  - JWT-based authentication
-  - Password encryption
-  - Role-based authorization
-  - Secure API endpoints
+- **Java**: 25
+- **Spring Boot**: 3.4.1
+- **Maven**: 3.9.11
+- **Database**: MySQL with JPA/Hibernate
+- **Security**: Spring Security + JWT
+- **Documentation**: SpringDoc OpenAPI
+- **Libraries**: Lombok, ModelMapper, Jakarta Validation
 
-## Technologies Used
-- **Core Framework**: Spring Boot 3.1.0
-- **Database**: MySQL with Spring Data JPA
-- **Security**: Spring Security with JWT
-- **API Documentation**: SpringDoc OpenAPI (Swagger UI)
-- **Other Libraries**:
-  - Lombok for boilerplate code reduction
-  - ModelMapper for object mapping
-  - Jakarta Validation for input validation
-  - JSON Web Tokens (JWT) for authentication
-
-## Database Schema Overview
-The application uses a relational database with the following key entities:
-- **User**: Stores user information and roles
-- **Address**: Manages user addresses with geolocation
-- **Booking**: Tracks laundry service orders
-- **DeliveryManagement**: Manages delivery information
-- **Payment**: Handles payment transactions
-
-## API Endpoints
-The application provides RESTful APIs for all major operations. The API documentation is automatically generated using Swagger UI and can be accessed at `/swagger-ui.html` when the application is running.
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
-Before you begin, ensure you have the following installed:
-*   **Java Development Kit (JDK) 17** or higher.
-*   **Maven 3.6.0** or higher.
-*   **MySQL Database**: A running instance of MySQL.
+- Java 25
+- Maven 3.9.11+
+- MySQL 8.0+
 
-### Setup and Installation
+### Setup
+1. **Clone repository**
+   ```bash
+   git clone <repository-url>
+   cd MautonLaundryJava
+   ```
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/MautonLaundryJava.git
-    cd MautonLaundryJava
+2. **Configure database**
+   ```properties
+   # src/main/resources/application.properties
+   spring.datasource.url=jdbc:mysql://localhost:3306/mauton_cleans
+   spring.datasource.username=your_username
+   spring.datasource.password=your_password
+   ```
 
-# MautonLaundryJava
+3. **Run application**
+   ```bash
+   ./mvnw spring-boot:run
+   ```
 
-```properties
-    spring.datasource.url=jdbc:mysql://localhost:3306/mauton_laundry_db?useSSL=false&serverTimezone=UTC
-    spring.datasource.username=your_mysql_username
-    spring.datasource.password=your_mysql_password
-    spring.jpa.hibernate.ddl-auto=update # or create, create-drop, none
-    spring.jpa.show-sql=true
+4. **Access API documentation**
+   - Swagger UI: `http://localhost:8079/swagger-ui.html`
+   - API runs on port: `8079`
 
-    mvn clean install
+## Project Structure
 
-    cd MautonLaundryJava
+```
+src/main/java/com/work/mautonlaundry/
+├── config/          # Configuration classes
+├── controllers/     # REST controllers
+├── data/           # Entities and repositories
+├── dtos/           # Data transfer objects
+├── exceptions/     # Custom exceptions
+├── security/       # Security configuration
+├── services/       # Business logic
+└── util/           # Utility classes
+```
 
-2.  **Configure Database (optional, see application.properties):**
-    *   Open `src/main/resources/application.properties` (or `application-dev.properties` if you're using a profile) and configure your MySQL database connection. Replace placeholders with your actual credentials:
-        ```properties
-        spring.datasource.url=jdbc:mysql://localhost:3306/mauton_laundry_db?useSSL=false&serverTimezone=UTC
-        spring.datasource.username=your_mysql_username
-        spring.datasource.password=your_mysql_password
-        spring.jpa.hibernate.ddl-auto=update # or create, create-drop, none
-        spring.jpa.show-sql=true
+## Database Schema
 
-   mvn clean install
-   mvn spring-boot:run
+Key entities: User, Address, Booking, DeliveryManagement, Payment
+
+## API Endpoints
+
+All endpoints documented via Swagger UI. Key operations:
+- User registration/authentication
+- Booking management
+- Delivery tracking
+- Payment processing
+
+## Security
+
+- JWT-based authentication
+- BCrypt password hashing
+- Role-based access control
+- Secure API endpoints
+
+## Development
+
+```bash
+# Build
+./mvnw clean install
+
+# Run tests
+./mvnw test
+
+# Package
+./mvnw package
+```
