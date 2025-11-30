@@ -48,7 +48,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     private final PasswordEncoder passwordEncoder;
 
-    private final ModelMapper mapper ;
+    private final ModelMapper mapper;
 
 //    @Autowired
 //    private AuditService auditService;
