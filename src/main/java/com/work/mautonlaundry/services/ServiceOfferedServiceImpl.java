@@ -2,21 +2,16 @@ package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.ServicePrice;
 import com.work.mautonlaundry.data.model.Services;
-import com.work.mautonlaundry.data.model.User;
-import com.work.mautonlaundry.data.repository.ServicePriceRepository;
+import com.work.mautonlaundry.data.model.enums.ServiceType;
 import com.work.mautonlaundry.data.repository.ServiceRepository;
 import com.work.mautonlaundry.dtos.requests.servicerequests.AddServiceRequest;
 import com.work.mautonlaundry.dtos.requests.servicerequests.UpdateServiceRequest;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.AddServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.UpdateServiceResponse;
 import com.work.mautonlaundry.dtos.responses.serviceresponse.ViewServiceResponse;
-import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceAlreadyExistException;
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
-import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import org.modelmapper.ModelMapper;
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,76 +20,50 @@ import org.springframework.transaction.annotation.Transactional;
 public class ServiceOfferedServiceImpl implements ServiceOfferedService {
     private final ServiceRepository serviceRepository;
 
-
-    private final ServicePriceRepository servicePriceRepository;
-
     @Autowired
     private ModelMapper mapper;
 
-    public ServiceOfferedServiceImpl(ServiceRepository serviceRepository, ServicePriceRepository servicePriceRepository) {
+    public ServiceOfferedServiceImpl(ServiceRepository serviceRepository) {
         this.serviceRepository = serviceRepository;
-        this.servicePriceRepository = servicePriceRepository;
-
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public AddServiceResponse addService(AddServiceRequest request) {
+        Services service = new Services();
+        service.setName(request.getService_name());
+        service.setCategory(request.getType_of_service());
+        service.setDescription(request.getService_details());
 
-@PreAuthorize("hasRole('ADMIN')")
-@Transactional
-public AddServiceResponse addService(AddServiceRequest request) {
-    if (serviceExist(request.getService_name())) {
-        throw new ServiceAlreadyExistException("Service already exist");
-    }
+        ServicePrice price = new ServicePrice();
+        price.setPrice(Double.valueOf(request.getService_price()));
+        price.setWhite(Double.valueOf(request.getService_price_white()));
+        
+        service.setServicePrice(price);
+        Services savedService = serviceRepository.save(service);
 
-    Services service = new Services();
-    service.setService_name(request.getService_name());
-    service.setType_of_service(request.getType_of_service());
-    service.setService_details(request.getService_details());
-    service.setPhotos(request.getPhotos());
+        AddServiceResponse response = new AddServiceResponse();
+        response.setId(savedService.getId());
+        response.setService_name(savedService.getName());
+        response.setService_details(savedService.getDescription());
+        response.setType_of_service(ServiceType.valueOf(savedService.getCategory().name()));
+        response.setServicePrice(savedService.getServicePrice());
 
-    Services savedService = serviceRepository.save(service);
-
-    ServicePrice price = new ServicePrice();
-    price.setPrice(request.getService_price());
-    price.setWhite(request.getService_price_white());
-    price.setService(savedService);
-
-    ServicePrice savedPrice = servicePriceRepository.save(price);
-
-    AddServiceResponse response = new AddServiceResponse();
-    response.setId(savedService.getId());
-    response.setService_name(savedService.getService_name());
-    response.setService_details(savedService.getService_details());
-    response.setType_of_service(savedService.getType_of_service());
-    response.setPhotos(savedService.getPhotos());
-    response.setServicePrice(savedPrice);
-
-    return response;
-}
-
-
-    private boolean serviceExist(Long id) {
-        return serviceRepository.existsById(id);
-    }
-
-    private boolean serviceExist(String service) {
-        return serviceRepository.existsByServiceName(service);
-    }
-
-    private Services findServiceByServiceName(String serviceName) {
-        return serviceRepository.findServicesByService_name(serviceName)
-                .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
-    }
-
-    private Services findServiceById(Long id) {
-        return serviceRepository.findById(id)
-                .orElseThrow(() -> new ServiceNotFoundException("Service doesn't exist"));
+        return response;
     }
 
     @Override
     public ViewServiceResponse getServiceById(Long id) {
+        Services service = serviceRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
+        
         ViewServiceResponse response = new ViewServiceResponse();
-        Services service = findServiceById(id);
-        mapper.map(service, response);
+        response.setId(service.getId());
+        response.setService_name(service.getName());
+        response.setService_details(service.getDescription());
+        response.setType_of_service(ServiceType.valueOf(service.getCategory().name()));
+        response.setServicePrice(service.getServicePrice());
+        
         return response;
     }
 
@@ -106,52 +75,42 @@ public AddServiceResponse addService(AddServiceRequest request) {
     @PreAuthorize("hasRole('ADMIN')")
     @Override
     public UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request) {
-        Services existingService = findServiceById(request.getId());
-        ServicePrice existingPrice = servicePriceRepository.findServicePriceByService(existingService);
+        Services existingService = serviceRepository.findByIdAndDeletedFalse(request.getId())
+                .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
 
-        existingPrice.setWhite(request.getService_price_white());
-        existingPrice.setPrice(request.getService_price());
-        existingPrice.setLocationMultiplier(existingPrice.getLocationMultiplier());
-
-       ServicePrice updatedServicePrice = servicePriceRepository.save(existingPrice);
-
-        existingService.setServicePrice(existingPrice);
-        existingService.setService_details(request.getService_details());
-        existingService.setPhotos(request.getPhotos());
-        existingService.setService_name(request.getService_name());
-        existingService.setType_of_service(request.getType_of_service());
+        existingService.setName(request.getService_name());
+        existingService.setDescription(request.getService_details());
+        existingService.setCategory(request.getType_of_service());
+        
+        ServicePrice price = existingService.getServicePrice();
+        price.setPrice(Double.valueOf(request.getService_price()));
+        price.setWhite(Double.valueOf(request.getService_price_white()));
 
         Services updatedService = serviceRepository.save(existingService);
-        return mapper.map(updatedService, UpdateServiceResponse.class);
+        
+        UpdateServiceResponse response = new UpdateServiceResponse();
+        response.setId(updatedService.getId());
+        response.setService_name(updatedService.getName());
+        response.setService_details(updatedService.getDescription());
+        response.setType_of_service(ServiceType.valueOf(updatedService.getCategory().name()));
+        
+        return response;
     }
 
-    private void deleteService(Services service) {
-            Services deletedService = serviceRepository.findServicesById(service.getId())
-                    .orElseThrow(() -> new UserNotFoundException("User Doesnt Exist"));
-
-            deletedService.setDeleted(true);
-            serviceRepository.save(deletedService);
-
+    @PreAuthorize("hasRole('ADMIN')")
+    @Override
+    public void deleteServiceById(Long id) {
+        Services service = serviceRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
+        
+        service.setDeleted(true);
+        serviceRepository.save(service);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @Override
     public void deleteServiceByName(String serviceName) {
-        if (!serviceExist(serviceName)) {
-            throw new ServiceNotFoundException("Service not found");
-        }
-        Services service = serviceRepository.findServicesByService_name(serviceName).orElseThrow(()-> new ServiceNotFoundException("Service Doesnt Exist"));
-        deleteService(service);
-}
-
-    @PreAuthorize("hasRole('ADMIN')")
-    @Override
-    public void deleteServiceById(Long id) {
-        if (!serviceExist(id)) {
-            throw new ServiceNotFoundException("Service not found");
-        }
-        Services service = serviceRepository.findServicesById(id).orElseThrow(()-> new ServiceNotFoundException("Service Doesnt Exist"));
-
-        deleteService(service);}
-
+        // This method would need a repository method to find by name
+        throw new UnsupportedOperationException("Delete by name not implemented");
+    }
 }

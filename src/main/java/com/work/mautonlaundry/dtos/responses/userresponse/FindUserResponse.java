@@ -10,9 +10,10 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class FindUserResponse {
-    private Long id;
+    private String id;
     private String email;
     private String full_name;
     private String address;
     private String phone_number;
+    private String userRole;
 }

@@ -18,19 +18,20 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collection;
 
 @RestController
+@RequestMapping("/api/v1/delivery")
 public class DeliveryController {
 
     @Autowired
     private DeliveryManagementService deliveryService;
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
-    @PostMapping("/registerPickup")
+    @PreAuthorize("hasAuthority('DELIVERY_CREATE')")
+    @PostMapping("/pickup")
     public CreateDeliveryResponse registerPickup(@RequestBody DeliveryRequest request){
         return deliveryService.createDeliveryDetails(request);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
-    @PostMapping("/set-laundry-agent-address/{id}")
+    @PreAuthorize("hasAuthority('DELIVERY_UPDATE')")
+    @PostMapping("/{id}/agent-address")
     public ResponseEntity<?> setLaundryAgentAddress(@PathVariable("id") Long id, @RequestParam Long agentAddress) {
         try {
             deliveryService.setLaundryManAddress(id, agentAddress);
@@ -42,28 +43,27 @@ public class DeliveryController {
         }
     }
 
-    @GetMapping("/viewDeliveryStatus/{id}")
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('DELIVERY_READ')")
     public PickupStatusResponse viewDelivery(@PathVariable("id") Long id){
-
         return deliveryService.findPickupById(id);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
-    @GetMapping("/viewAllDelivery")
+    @PreAuthorize("hasAuthority('DELIVERY_READ')")
+    @GetMapping
     public Collection<DeliveryManagement> viewAllDelivery() {
-
         return deliveryService.getRepository().findAll();
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
-    @PutMapping("/updateDelivery")
+    @PreAuthorize("hasAuthority('DELIVERY_UPDATE')")
+    @PutMapping
     public PickupStatusUpdateResponse updatePickupStatus(@RequestBody PickupStatusUpdateRequest request)
     {
         return deliveryService.pickupUpdate(request);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
-    @DeleteMapping("/delivery/{id}")
+    @PreAuthorize("hasAuthority('DELIVERY_DELETE')")
+    @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteDelivery(@PathVariable("id") Long id) {
         try {
             deliveryService.deletePickup(id);

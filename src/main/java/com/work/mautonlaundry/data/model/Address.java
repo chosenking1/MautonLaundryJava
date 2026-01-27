@@ -29,7 +29,7 @@ public class Address {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
-    private User user;
+    private AppUser user;
 
     @Column
     private Boolean isDefault; // To mark the default address

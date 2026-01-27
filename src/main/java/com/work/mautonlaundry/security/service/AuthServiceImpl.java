@@ -1,6 +1,6 @@
 package com.work.mautonlaundry.security.service;
 
-import com.work.mautonlaundry.data.model.User;
+import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.dtos.requests.userrequests.UserLoginRequest;
 import lombok.AllArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -39,14 +39,14 @@ public class AuthServiceImpl implements AuthService {
         return token;
     }
 
-    public Optional<User> getCurrentAuthenticatedUser() {
+    public Optional<AppUser> getCurrentAuthenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return Optional.empty();
         }
 
         // Assuming your User implements UserDetails
-        return Optional.ofNullable((User) authentication.getPrincipal());
+        return Optional.ofNullable((AppUser) authentication.getPrincipal());
     }
 
 

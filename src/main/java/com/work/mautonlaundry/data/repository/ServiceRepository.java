@@ -1,27 +1,14 @@
 package com.work.mautonlaundry.data.repository;
 
 import com.work.mautonlaundry.data.model.Services;
+import com.work.mautonlaundry.data.model.enums.ServiceType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
-@Repository
+
 public interface ServiceRepository extends JpaRepository<Services, Long> {
-
-        @Query("SELECT s FROM Services s WHERE s.service_name = :name")
-        Optional<Services> findServicesByService_name(@Param("name") String name);
-
-    @Query("select (count(s) > 0) from Services s")
-    boolean existsByServiceName(String service);
-
-//    Services findServicesById(Long id);
-
-    Optional<Services>  findServicesById(Long id);
-
-
-//    Optional<Services> findServicesByService_name(String service);
-//    Optional<Services> deleteServicesByService_name(String service);
-
+    List<Services> findByDeletedFalse();
+    Optional<Services> findByIdAndDeletedFalse(Long id);
+    List<Services> findByCategoryAndDeletedFalse(ServiceType category);
 }

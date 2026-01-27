@@ -1,6 +1,9 @@
 package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.*;
+import com.work.mautonlaundry.data.model.enums.DeliveryStatus;
+import com.work.mautonlaundry.data.model.enums.ServiceType;
+import com.work.mautonlaundry.data.model.enums.UrgencyType;
 import com.work.mautonlaundry.data.repository.*;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.DeliveryRequest;
 import com.work.mautonlaundry.dtos.requests.deliverymanagementrequests.PickupStatusUpdateRequest;
@@ -170,15 +173,13 @@ public class DeliveryManagementServiceImpl implements DeliveryManagementService{
         DeliveryManagement delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new BookingNotFoundException("Delivery not found with id: " + deliveryId));
 
-        Booking booking = bookingRepository.findBookingById(bookingId);
-        if (booking == null || booking.getDeleted()== true) {
-            throw new BookingNotFoundException("Booking not found with id: " + bookingId);
-        }
+        Booking booking = bookingRepository.findById(String.valueOf(bookingId))
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found with id: " + bookingId));
         Optional<BookingResource> bookingResource = Optional.ofNullable(bookingResourceRepository.findByBookingId(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("Booking resource not found for booking id: " + bookingId)));
 
-        if(booking.getType_of_service() == ServiceType.LAUNDRY) {
-            User agent = userRepository.findUserById(bookingResource.get().getLaundryAgentId())
+        if(booking.getBookingType() == Booking.BookingType.LAUNDRY) {
+            AppUser agent = userRepository.findUserById(bookingResource.get().getLaundryAgentId())
                     .orElseThrow(() -> new UserNotFoundException("Agent not found with id: " + bookingResource.get().getLaundryAgentId()));
             delivery.setAgentAddress(agent.getMostRecentlyUsedAddress().getId());
             deliveryRepository.save(delivery);

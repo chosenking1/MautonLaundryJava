@@ -1,8 +1,8 @@
 package com.work.mautonlaundry.dtos.requests.bookingrequests;
 
 
-import com.work.mautonlaundry.data.model.ServiceType;
-import com.work.mautonlaundry.data.model.UrgencyType;
+import com.work.mautonlaundry.data.model.enums.ServiceType;
+import com.work.mautonlaundry.data.model.enums.UrgencyType;
 import com.work.mautonlaundry.dtos.requests.servicerequests.ServiceRequestDetail;
 
 import lombok.AllArgsConstructor;

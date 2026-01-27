@@ -1,10 +1,8 @@
 package com.work.mautonlaundry.dtos.requests.deliverymanagementrequests;
 
-import com.work.mautonlaundry.data.model.DeliveryStatus;
-import com.work.mautonlaundry.data.model.LaundryStatus;
+import com.work.mautonlaundry.data.model.enums.DeliveryStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Setter

@@ -1,6 +1,6 @@
 package com.work.mautonlaundry.dtos.requests.bookingrequests;
 
-import com.work.mautonlaundry.data.model.LaundryStatus;
+import com.work.mautonlaundry.data.model.enums.LaundryStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;

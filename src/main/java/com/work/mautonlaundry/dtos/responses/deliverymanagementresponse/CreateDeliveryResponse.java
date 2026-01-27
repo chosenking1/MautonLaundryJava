@@ -1,6 +1,6 @@
 package com.work.mautonlaundry.dtos.responses.deliverymanagementresponse;
 
-import com.work.mautonlaundry.data.model.DeliveryStatus;
+import com.work.mautonlaundry.data.model.enums.DeliveryStatus;
 import lombok.*;
 
 @Data

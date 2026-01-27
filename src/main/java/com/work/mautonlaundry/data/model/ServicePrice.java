@@ -1,29 +1,27 @@
 package com.work.mautonlaundry.data.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
-@NoArgsConstructor
 @Table(name = "service_price")
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
 public class ServicePrice {
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
     @Column(nullable = false)
-    private int price;
+    private Double price;
 
+    @Column(nullable = false)
+    private Double white;
 
-    private int white;
-
-    private int locationMultiplier;
-
-//    private int express;
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_id")
-    private Services service;
+    @Column(nullable = false)
+    private Double locationMultiplier = 1.0;
 }

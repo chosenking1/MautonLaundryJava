@@ -1,6 +1,6 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.User;
+import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.dtos.requests.userrequests.RegisterUserRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest;
@@ -32,4 +32,12 @@ public interface UserService {
     UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest request);
 
     void updateUserRole(UpdateUserRoleRequest request);
+    
+    // Email verification methods
+    void sendEmailVerification(String email);
+    boolean verifyEmail(String token);
+    
+    // Password reset methods
+    void sendPasswordResetEmail(String email);
+    boolean resetPassword(String token, String newPassword);
 }

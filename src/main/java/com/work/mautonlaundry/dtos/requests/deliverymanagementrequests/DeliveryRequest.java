@@ -1,6 +1,6 @@
 package com.work.mautonlaundry.dtos.requests.deliverymanagementrequests;
 
-import com.work.mautonlaundry.data.model.UrgencyType;
+import com.work.mautonlaundry.data.model.enums.UrgencyType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

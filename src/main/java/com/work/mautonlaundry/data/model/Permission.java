@@ -3,10 +3,12 @@ package com.work.mautonlaundry.data.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Entity
 @NoArgsConstructor
-@Table(name = "permission")
+@AllArgsConstructor
+@Table(name = "permissions")
 @Data
 public class Permission {
 
@@ -14,10 +16,14 @@ public class Permission {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true, nullable = false)
+    private String name;
 
-    private String method;
+    private String description;
 
-    @Column()
-    private String path;
+    @Column(nullable = false)
+    private String resource;
 
+    @Column(nullable = false)
+    private String action;
 }

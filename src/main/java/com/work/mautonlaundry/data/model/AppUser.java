@@ -16,41 +16,51 @@ import java.util.List;
 @Setter
 @Validated
 @NoArgsConstructor
-
-public class User {
+@Table(name = "users")
+public class AppUser {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private String id;
 
     @Email
-    @Column(unique = true)
+    @Column(unique = true, nullable = false)
     private String email;
 
-    @Size(min = 6, max = 15)
+    @Size(min = 6, max = 120) // Increased max size for hashed passwords
+    @Column(nullable = false)
     private String password;
 
     @Column
     private String full_name;
 
     @Column(nullable = false)
-    private String address;
+    private String address; // Note: This might be redundant with the addresses list, but keeping for now
 
     @Column
     private String phone_number;
 
-    @Column
-    private Boolean deleted;
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean deleted = false;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private UserRole userRole;
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean emailVerified = false;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id", nullable = false)
+    private Role role;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<Address> addresses;
 
+    // Helper method to check for a role
+    public boolean hasRole(String roleName) {
+        return this.role != null && this.role.getName().equals(roleName);
+    }
+
     // Method to get the default address
     public Address getDefaultAddress() {
+        if (addresses == null || addresses.isEmpty()) return null;
         return addresses.stream()
                 .filter(address -> address.getIsDefault() != null && address.getIsDefault())
                 .findFirst()
@@ -58,6 +68,7 @@ public class User {
     }
     // Method to get the most recently used address
     public Address getMostRecentlyUsedAddress() {
+        if (addresses == null || addresses.isEmpty()) return null;
         return addresses.stream()
                 .filter(address -> !address.getDeleted())
                 .max((a1, a2) -> a1.getLastUsed().compareTo(a2.getLastUsed()))

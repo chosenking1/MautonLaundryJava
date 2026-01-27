@@ -1,45 +1,34 @@
 package com.work.mautonlaundry.data.model;
 
+import com.work.mautonlaundry.data.model.enums.ServiceType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.List;
-
-
 @Entity
 @Getter
 @Setter
 @NoArgsConstructor
-@Table
 public class Services {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
-
-    @Column(unique = true,nullable = false)
-    private String service_name;
-
-//    @Column(nullable = false)
-//    private String service_category;
+    @Column(nullable = false)
+    private String name;
 
     @Column
-    private String service_details;
+    private String description;
 
-    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    private ServiceType type_of_service;
-
-    @Column(nullable = false, length = 100)
-    private String photos;
-
     @Column(nullable = false)
-    private Boolean deleted = false;
+    private ServiceType category;
 
-    @OneToOne(mappedBy = "service", cascade = CascadeType.ALL)
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @JoinColumn(name = "service_price_id")
     private ServicePrice servicePrice;
 
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean deleted = false;
 }

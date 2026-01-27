@@ -1,6 +1,6 @@
 package com.work.mautonlaundry.dtos.requests.paymentrequests;
 
-import com.work.mautonlaundry.data.model.PaymentMethod;
+import com.work.mautonlaundry.data.model.enums.PaymentMethod;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 public class CreatePaymentRequest {
 
     @NotNull
-    private Long bookingId;
+    private String bookingId;
 
     @NotNull
     private BigDecimal amount;

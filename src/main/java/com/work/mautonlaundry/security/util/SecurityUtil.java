@@ -1,20 +1,38 @@
 package com.work.mautonlaundry.security.util;
 
-import com.work.mautonlaundry.data.model.User;
+import com.work.mautonlaundry.data.model.AppUser;
+import com.work.mautonlaundry.data.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
+@Component
 public class SecurityUtil {
 
-    public static Optional<User> getCurrentUser() {
+    private static UserRepository userRepository;
+
+    @Autowired
+    public void setUserRepository(UserRepository userRepository) {
+        SecurityUtil.userRepository = userRepository;
+    }
+
+    public static Optional<AppUser> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
             return Optional.empty();
         }
 
-        return Optional.ofNullable((User) authentication.getPrincipal());
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserDetails) {
+            String username = ((UserDetails) principal).getUsername();
+            return userRepository.findUserByEmail(username);
+        }
+
+        return Optional.empty();
     }
 }
 

@@ -1,40 +1,99 @@
 package com.work.mautonlaundry.controllers;
 
+import com.work.mautonlaundry.dtos.requests.PasswordResetRequest;
+import com.work.mautonlaundry.dtos.requests.VerifyEmailRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UserLoginRequest;
 import com.work.mautonlaundry.dtos.responses.userresponse.UserLoginResponse;
 import com.work.mautonlaundry.security.service.AuthService;
+import com.work.mautonlaundry.services.AuditService;
 import com.work.mautonlaundry.services.UserService;
-import lombok.AllArgsConstructor;
+import com.work.mautonlaundry.util.ValidEmail;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
 
-@AllArgsConstructor
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    private AuthService authService;
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private AuthService authService;
+    
+    @Autowired
+    private AuditService auditService;
 
     @PostMapping("/login")
-    public ResponseEntity<UserLoginResponse> login(@RequestBody UserLoginRequest loginDto){
-        String token = null;
+    public ResponseEntity<UserLoginResponse> login(@Valid @RequestBody UserLoginRequest request) {
+        log.info("Login attempt for email: {}", request.getEmail());
         try {
-            token = authService.login(loginDto);
-
+            String token = authService.login(request);
+            UserLoginResponse response = new UserLoginResponse(token, "Bearer");
+            auditService.logAction("LOGIN", "AUTH", request.getEmail());
+            log.info("Login successful for email: {}", request.getEmail());
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            auditService.logAction("LOGIN_FAILED", "AUTH", request.getEmail());
+            log.warn("Login failed for email: {} - {}", request.getEmail(), e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
+    }
 
-        UserLoginResponse response = new UserLoginResponse();
-        response.setAccessToken(token);
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout() {
+        log.info("User logout requested");
+        auditService.logAction("LOGOUT", "AUTH");
+        SecurityContextHolder.clearContext();
+        log.info("User logged out successfully");
+        return ResponseEntity.ok("Logged out successfully");
+    }
 
-        return new ResponseEntity<>(response, HttpStatus.OK);
+    @PostMapping("/send-verification")
+    public ResponseEntity<String> sendEmailVerification(@RequestParam @NotBlank String email) {
+        log.info("Email verification requested");
+        userService.sendEmailVerification(email);
+        log.info("Email verification sent successfully");
+        return ResponseEntity.ok("Verification email sent");
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<String> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        log.info("Email verification attempt with token");
+        boolean verified = userService.verifyEmail(request.getToken());
+        if (verified) {
+            log.info("Email verification successful");
+            return ResponseEntity.ok("Email verified successfully");
+        }
+        log.warn("Email verification failed - invalid or expired token");
+        return ResponseEntity.badRequest().body("Invalid or expired token");
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestParam @NotBlank String email) {
+        log.info("Password reset requested");
+        userService.sendPasswordResetEmail(email);
+        log.info("Password reset email sent successfully");
+        return ResponseEntity.ok("Password reset email sent");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        log.info("Password reset attempt with token");
+        boolean reset = userService.resetPassword(request.getToken(), request.getNewPassword());
+        if (reset) {
+            log.info("Password reset successful");
+            return ResponseEntity.ok("Password reset successfully");
+        }
+        log.warn("Password reset failed - invalid or expired token");
+        return ResponseEntity.badRequest().body("Invalid or expired token");
     }
 }

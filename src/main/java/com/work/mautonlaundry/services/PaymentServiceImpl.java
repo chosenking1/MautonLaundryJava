@@ -2,7 +2,7 @@ package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.Payment;
-import com.work.mautonlaundry.data.model.PaymentStatus;
+import com.work.mautonlaundry.data.model.enums.PaymentStatus;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.data.repository.PaymentRepository;
 import com.work.mautonlaundry.dtos.requests.paymentrequests.CreatePaymentRequest;

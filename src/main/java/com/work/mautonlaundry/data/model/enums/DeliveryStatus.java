@@ -1,4 +1,4 @@
-package com.work.mautonlaundry.data.model;
+package com.work.mautonlaundry.data.model.enums;
 
 public enum DeliveryStatus {
     PENDING_PICKUP,

@@ -1,6 +1,7 @@
 package com.work.mautonlaundry.dtos.requests.userrequests;
 
-import jakarta.validation.constraints.Email;
+import com.work.mautonlaundry.util.ValidEmail;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,7 +15,8 @@ public class RegisterUserRequest {
     private String firstname;
     private String second_name;
 
-    @Email
+    @ValidEmail
+    @NotBlank(message = "Email is required")
     private String email;
 
     private String phone_number;

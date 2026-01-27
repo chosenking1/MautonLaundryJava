@@ -1,7 +1,8 @@
 package com.work.mautonlaundry.data.model;
 
+import com.work.mautonlaundry.data.model.enums.DeliveryStatus;
+import com.work.mautonlaundry.data.model.enums.UrgencyType;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

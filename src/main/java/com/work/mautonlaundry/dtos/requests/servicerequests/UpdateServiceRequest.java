@@ -1,6 +1,6 @@
 package com.work.mautonlaundry.dtos.requests.servicerequests;
 
-import com.work.mautonlaundry.data.model.ServiceType;
+import com.work.mautonlaundry.data.model.enums.ServiceType;
 import lombok.*;
 
 @Data

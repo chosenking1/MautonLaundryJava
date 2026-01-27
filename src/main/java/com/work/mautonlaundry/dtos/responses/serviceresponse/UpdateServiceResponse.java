@@ -1,7 +1,7 @@
 package com.work.mautonlaundry.dtos.responses.serviceresponse;
 
 import com.work.mautonlaundry.data.model.ServicePrice;
-import com.work.mautonlaundry.data.model.ServiceType;
+import com.work.mautonlaundry.data.model.enums.ServiceType;
 import lombok.Data;
 
 

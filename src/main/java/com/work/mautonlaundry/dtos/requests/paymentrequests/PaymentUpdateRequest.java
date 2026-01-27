@@ -1,6 +1,6 @@
 package com.work.mautonlaundry.dtos.requests.paymentrequests;
 
-import com.work.mautonlaundry.data.model.PaymentStatus;
+import com.work.mautonlaundry.data.model.enums.PaymentStatus;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;

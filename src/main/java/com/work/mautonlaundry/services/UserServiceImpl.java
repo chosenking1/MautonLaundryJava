@@ -1,8 +1,13 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.User;
-import com.work.mautonlaundry.data.model.UserRole;
+import com.work.mautonlaundry.data.model.AppUser;
+import com.work.mautonlaundry.data.model.Permission;
+import com.work.mautonlaundry.data.model.Role;
+import com.work.mautonlaundry.data.model.VerificationToken;
+import com.work.mautonlaundry.data.repository.RoleRepository;
 import com.work.mautonlaundry.data.repository.UserRepository;
+import com.work.mautonlaundry.data.repository.VerificationTokenRepository;
+import com.work.mautonlaundry.util.TokenGenerator;
 import com.work.mautonlaundry.dtos.requests.userrequests.RegisterUserRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserRoleRequest;
@@ -12,16 +17,14 @@ import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailRespon
 import com.work.mautonlaundry.exceptions.userexceptions.UserAlreadyExistsException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import com.work.mautonlaundry.security.service.AuthService;
-
 import com.work.mautonlaundry.security.util.SecurityUtil;
-import jakarta.persistence.Cacheable;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.CacheManager;
 import jakarta.validation.Valid;
-import org.apache.commons.logging.Log;
 import org.modelmapper.ModelMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,33 +33,44 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class UserServiceImpl implements UserService, UserDetailsService {
 
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final VerificationTokenRepository tokenRepository;
+    private final EmailService emailService;
+    private final TokenGenerator tokenGenerator;
+    private final CacheManager cacheManager;
     private final AuthService authService;
-    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
     private final PasswordEncoder passwordEncoder;
 
     private final ModelMapper mapper;
 
-//    @Autowired
-//    private AuditService auditService;
+    @Autowired
+    private AuditService auditService;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, @Lazy AuthService authService,
-                           PasswordEncoder passwordEncoder, ModelMapper mapper) {
+    public UserServiceImpl(UserRepository userRepository, RoleRepository roleRepository, VerificationTokenRepository tokenRepository,
+                           EmailService emailService, TokenGenerator tokenGenerator, CacheManager cacheManager,
+                           @Lazy AuthService authService, PasswordEncoder passwordEncoder, ModelMapper mapper) {
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.tokenRepository = tokenRepository;
+        this.emailService = emailService;
+        this.tokenGenerator = tokenGenerator;
+        this.cacheManager = cacheManager;
         this.authService = authService;
         this.passwordEncoder = passwordEncoder;
         this.mapper = mapper;
@@ -66,7 +80,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Validated
     @Transactional
     public RegisterUserResponse registerUser(@Valid RegisterUserRequest request) {
-        User user = new User();
+        AppUser user = new AppUser();
         RegisterUserResponse registerResponse = new RegisterUserResponse();
 
         if(userRepository.existsByEmail(request.getEmail())) {
@@ -76,13 +90,18 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         user.setFull_name(request.getFirstname() +" "+ request.getSecond_name());
         user.setAddress(request.getAddress());
         user.setEmail(request.getEmail());
-        user.setUserRole(UserRole.USER);
+        
+        // Assign default role
+        Role customerRole = roleRepository.findByName("CUSTOMER")
+                .orElseThrow(() -> new RuntimeException("Default role 'CUSTOMER' not found in database"));
+        user.setRole(customerRole);
+        
         user.setPassword(setPassword(request.getPassword()));
         user.setPhone_number(request.getPhone_number());
-        User userDetails = userRepository.save(user);
+        AppUser userDetails = userRepository.save(user);
 
-//        mapper.map(userDetails, registerResponse);
-            registerResponse.setEmail(userDetails.getEmail());
+        auditService.logAction("CREATE", "USER", userDetails.getEmail());
+        registerResponse.setEmail(userDetails.getEmail());
         }
 
         return registerResponse;
@@ -94,10 +113,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
+    @Cacheable(value = "users", key = "#userEmail.toLowerCase()")
     public FindUserResponse findUserByEmail(String userEmail) {
         FindUserResponse response = new FindUserResponse();
         userEmail = userEmail.toLowerCase();
-        User user = userRepository.findUserByEmail(userEmail)
+        AppUser user = userRepository.findUserByEmail(userEmail)
                 .orElseThrow(() -> new UserNotFoundException("User Doesn't Exist"));
         mapper.map(user, response);
         return response;
@@ -105,11 +125,18 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findUserByEmail(username)
+        AppUser user = userRepository.findUserByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
 
-        List<GrantedAuthority> authorities = new ArrayList<>();
-        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getUserRole().name()));
+        Set<GrantedAuthority> authorities = new HashSet<>();
+        if (user.getRole() != null) {
+            // Add role as an authority, e.g., "ROLE_ADMIN"
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()));
+            // Add all permissions associated with the role, e.g., "USER_READ", "USER_CREATE"
+            for (Permission permission : user.getRole().getPermissions()) {
+                authorities.add(new SimpleGrantedAuthority(permission.getName()));
+            }
+        }
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
@@ -117,16 +144,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
                 authorities);
     }
 
-//    private Set<SimpleGrantedAuthority> getAuthority(User user) {
-//        Set<SimpleGrantedAuthority> authorities = new HashSet<>();
-//        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getUserRole().name()));
-//        return authorities;
-//    }
-
     @Override
+    @Cacheable(value = "users", key = "#id")
     public FindUserResponse findUserById(String id) {
         FindUserResponse response = new FindUserResponse();
-        User user = userRepository.findUserById(id)
+        AppUser user = userRepository.findUserById(id)
                 .orElseThrow(() -> new UserNotFoundException("User Doesn't Exist"));
         mapper.map(user, response);
         return response;
@@ -148,50 +170,43 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
 
-    private void deleteUser(User user) {
+    private void deleteUser(AppUser user) {
         if(isLoggedInUserAccount(user.getId()) || userIsAdmin()){
-            User deletedUser = userRepository.findUserById(user.getId())
+            AppUser deletedUser = userRepository.findUserById(user.getId())
                     .orElseThrow(() -> new UserNotFoundException("User Doesnt Exist"));
 
             deletedUser.setDeleted(true);
             userRepository.save(deletedUser);}
-//        } else if (userIsAdmin()) {
-//            User deletedUser = userRepository.findUserById(user.getId())
-//                    .orElseThrow(() -> new UserNotFoundException("User Doesnt Exist"));
-//
-//            deletedUser.setDeleted(true);
-//            userRepository.save(deletedUser);
-//        }
         else {
             throw new AccessDeniedException("User not permitted to perform this operation");
         }
 
     }
 
-    private User loggedInUser() {
-        // Get current authenticated user
-//        return authService.getCurrentAuthenticatedUser()
-//                .orElseThrow(() -> new SecurityException("User not authenticated"));
-
+    private AppUser loggedInUser() {
         return SecurityUtil.getCurrentUser().orElseThrow(() -> new SecurityException("User not authenticated"));
-
     }
 
     private Boolean isLoggedInUserAccount(String id){
         return loggedInUser().getId().equals(id);
     }
+    
     private Boolean userIsAdmin(){
-        return loggedInUser().getUserRole().equals(UserRole.ADMIN);
+        AppUser loggedIn = loggedInUser();
+        return loggedIn.getRole() != null && loggedIn.getRole().getName().equals("ADMIN");
     }
+    
     @Override
+    @CacheEvict(value = "users", key = "#id")
     public void deleteUserById(String id) {
-        User user = userRepository.findUserById(id).orElseThrow(() -> new UserNotFoundException("User Doesnt Exist"));
+        AppUser user = userRepository.findUserById(id).orElseThrow(() -> new UserNotFoundException("User Doesnt Exist"));
         deleteUser(user);
+        auditService.logAction("DELETE", "USER", id);
     }
     @Override
-//    @Cacheable(value = "users", key = "#email")
-    public  void deleteUserByEmail(String email) {
-        User user = userRepository.findUserByEmail(email).orElseThrow(()-> new UserNotFoundException("User Doesnt Exist"));
+    @CacheEvict(value = "users", key = "#email.toLowerCase()")
+    public void deleteUserByEmail(String email) {
+        AppUser user = userRepository.findUserByEmail(email).orElseThrow(()-> new UserNotFoundException("User Doesnt Exist"));
         deleteUser(user);
 
     }
@@ -204,7 +219,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         // Check if the user exists
         if (isLoggedInUserAccount(user.getId()) || userIsAdmin()) {
 
-                User existingUser = userRepository.findUserById(user.getId())
+                AppUser existingUser = userRepository.findUserById(user.getId())
                         .orElseThrow(() -> new UserNotFoundException("User doesn't exist"));;
 
                 // Update only the necessary fields
@@ -214,6 +229,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
                 // Save the updated user
                 userRepository.save(existingUser);
+                auditService.logAction("UPDATE", "USER", user.getId());
 
                 String message = "Details Updated Successfully";
                 mapper.map(message, updateResponse);
@@ -227,26 +243,91 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void updateUserRole(UpdateUserRoleRequest request) {
-        // Verify admin privileges
-        if (!userIsAdmin()) {
-            throw new AccessDeniedException("Only ADMIN can update user roles");
-        }else {
-            // Find target user
-            User targetUser = userRepository.findUserById(request.getUserId())
-                    .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + request.getUserId()));
+        // This method should be deprecated or updated to use RoleChangeRequest
+        // For now, we'll implement direct update for ADMINs as a fallback
+        AppUser user = userRepository.findUserById(request.getUserId())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        
+        Role role = roleRepository.findByName(request.getRoleName())
+                .orElseThrow(() -> new RuntimeException("Role not found"));
+        
+        user.setRole(role);
 
-            // Update role
-            targetUser.setUserRole(request.getRole());
-            userRepository.save(targetUser);
-
-            // Optional: Log the role change
-            log.info("User {} role changed to {} by admin {} ",
-                    targetUser.getFull_name(), request.getRole(), loggedInUser().getFull_name());
-        }
-
+        userRepository.save(user);
     }
 
+    @Override
+    public void sendEmailVerification(String email) {
+        AppUser user = userRepository.findUserByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        
+        String token = tokenGenerator.generateSecureToken();
+        VerificationToken verificationToken = new VerificationToken(token, user, VerificationToken.TokenType.EMAIL_VERIFICATION);
+        tokenRepository.save(verificationToken);
+        
+        emailService.sendVerificationEmail(email, token);
+    }
 
+    @Override
+    @Transactional
+    public boolean verifyEmail(String token) {
+        VerificationToken verificationToken = tokenRepository.findByToken(token)
+                .orElse(null);
+        
+        if (verificationToken == null || verificationToken.isExpired() || verificationToken.isUsed()) {
+            return false;
+        }
+        
+        AppUser user = verificationToken.getUser();
+        user.setEmailVerified(true);
+        userRepository.save(user);
+        
+        // Manual cache eviction
+        cacheManager.getCache("users").evict(user.getEmail().toLowerCase());
+        
+        verificationToken.setUsed(true);
+        tokenRepository.save(verificationToken);
+        
+        return true;
+    }
 
+    @Override
+    public void sendPasswordResetEmail(String email) {
+        AppUser user = userRepository.findUserByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        
+        String token = tokenGenerator.generateSecureToken();
+        VerificationToken resetToken = new VerificationToken(token, user, VerificationToken.TokenType.PASSWORD_RESET);
+        tokenRepository.save(resetToken);
+        
+        emailService.sendPasswordResetEmail(email, token);
+    }
 
+    @Override
+    @Transactional
+    public boolean resetPassword(String token, String newPassword) {
+        VerificationToken resetToken = tokenRepository.findByToken(token)
+                .orElse(null);
+        
+        if (resetToken == null || resetToken.isExpired() || resetToken.isUsed()) {
+            return false;
+        }
+        
+        // Validate password
+        if (newPassword == null || newPassword.length() < 6 || newPassword.length() > 15) {
+            throw new IllegalArgumentException("Password must be between 6 and 15 characters");
+        }
+        
+        AppUser user = resetToken.getUser();
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        
+        // Manual cache eviction
+        cacheManager.getCache("users").evict(user.getEmail().toLowerCase());
+        
+        resetToken.setUsed(true);
+        tokenRepository.save(resetToken);
+        
+        return true;
+    }
 }

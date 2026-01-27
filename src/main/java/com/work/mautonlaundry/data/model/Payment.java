@@ -1,6 +1,8 @@
 package com.work.mautonlaundry.data.model;
 
 
+import com.work.mautonlaundry.data.model.enums.PaymentMethod;
+import com.work.mautonlaundry.data.model.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;

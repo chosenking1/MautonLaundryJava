@@ -48,6 +48,8 @@ public class BasicConfiguration{
                                 .requestMatchers(HttpMethod.PUT,"/updateService").hasRole("ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings").hasRole("USER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/addresses").hasRole("USER")
                         .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/user").hasAnyRole("ADMIN", "USER")
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

@@ -1,60 +1,51 @@
 package com.work.mautonlaundry.controllers;
 
 import com.work.mautonlaundry.data.model.Booking;
-import com.work.mautonlaundry.dtos.requests.bookingrequests.RegisterBookingRequest;
-import com.work.mautonlaundry.dtos.requests.bookingrequests.UpdateBookingRequest;
-import com.work.mautonlaundry.dtos.responses.bookingresponse.RegisterBookingResponse;
-import com.work.mautonlaundry.dtos.responses.bookingresponse.UpdateBookingResponse;
-import com.work.mautonlaundry.dtos.responses.bookingresponse.ViewBookingResponse;
+import com.work.mautonlaundry.dtos.requests.bookingrequests.CreateBookingRequest;
+import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingDetailsResponse;
+import com.work.mautonlaundry.dtos.responses.bookingresponse.CreateBookingResponse;
 import com.work.mautonlaundry.services.BookingService;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-
-import java.util.Collection;
+import java.util.Map;
 
 @RestController
+@RequestMapping("/api/v1/bookings")
+@RequiredArgsConstructor
 public class BookingController {
-    @Autowired
-    private BookingService bookingService;
+    
+    private final BookingService bookingService;
 
-
-    @PostMapping("/registerBooking")
-    public RegisterBookingResponse registerBooking(@RequestBody RegisterBookingRequest request){
-        return bookingService.registerBooking(request);
+    @PostMapping
+    @PreAuthorize("hasAuthority('BOOKING_CREATE')")
+    public ResponseEntity<CreateBookingResponse> createBooking(@Valid @RequestBody CreateBookingRequest request) {
+        CreateBookingResponse response = bookingService.createBooking(request);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-
-    @GetMapping("/viewBooking/{id}")
-    public ViewBookingResponse viewBooking(@PathVariable("id") Long id){
-
-        return bookingService.viewBooking(id);
+    @GetMapping("/{bookingId}")
+    @PreAuthorize("hasAuthority('BOOKING_READ')")
+    public ResponseEntity<BookingDetailsResponse> getBooking(@PathVariable String bookingId) {
+        BookingDetailsResponse response = bookingService.getBookingDetails(bookingId);
+        return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/viewAllBooking")
-    public Collection<Booking> viewAllBooking() {
-
-        return bookingService.getRepository().findAll();
-    }
-
-    @PutMapping("/updateBooking")
-    public UpdateBookingResponse updateBookingStatus(@RequestBody UpdateBookingRequest request)
-    {
-        return bookingService.bookingDetailsUpdate(request);
-    }
-
-    @DeleteMapping("/deleteBooking/{id}")
-    public ResponseEntity<?> deleteBooking(@PathVariable("id") Long id) {
-        try {
-            bookingService.deleteBooking(id);
-            return ResponseEntity.ok().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    @PatchMapping("/{bookingId}/status")
+    @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
+    public ResponseEntity<Map<String, String>> updateBookingStatus(
+            @PathVariable String bookingId,
+            @RequestBody Map<String, String> request) {
+        
+        String statusStr = request.get("status");
+        Booking.BookingStatus status = Booking.BookingStatus.valueOf(statusStr);
+        
+        bookingService.updateBookingStatus(bookingId, status);
+        
+        return ResponseEntity.ok(Map.of("message", "Status updated successfully"));
     }
 }
