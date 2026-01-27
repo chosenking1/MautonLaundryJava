@@ -1,0 +1,52 @@
+{
+  "baseUrl": "http://localhost:8079",
+  "endpoints": {
+    "auth": {
+      "login": "/api/auth/login",
+      "logout": "/api/auth/logout",
+      "register": "/register",
+      "sendVerification": "/api/auth/send-verification",
+      "verifyEmail": "/api/auth/verify-email",
+      "forgotPassword": "/api/auth/forgot-password",
+      "resetPassword": "/api/auth/reset-password"
+    },
+    "users": {
+      "getByEmail": "/api/v1/users/getUser/{email}",
+      "getById": "/api/v1/users/{userId}",
+      "getUserRole": "/api/v1/users/{userId}/role",
+      "updateUser": "/api/v1/users/{userId}",
+      "getUserDashboard": "/api/v1/users/getUserDashboard/{email}",
+      "getNotifications": "/getNotifications/{userId}",
+      "getPermissions": "/api/user/permissions"
+    },
+    "admin": {
+      "dashboard": "/api/admin/analytics/dashboard",
+      "usersByRole": "/api/admin/analytics/users-by-role",
+      "monthlyStats": "/api/admin/analytics/monthly-stats"
+    },
+    "bookings": {
+      "create": "/registerBooking",
+      "getById": "/viewBooking/{id}",
+      "getAll": "/viewAllBooking",
+      "update": "/updateBooking",
+      "delete": "/deleteBooking/{id}",
+      "search": "/searchBookings"
+    },
+    "delivery": {
+      "create": "/createDelivery",
+      "getById": "/getDelivery/{id}",
+      "updateStatus": "/updateDeliveryStatus"
+    },
+    "payment": {
+      "create": "/createPayment",
+      "getById": "/getPayment/{id}"
+    },
+    "services": {
+      "getAll": "/api/services",
+      "getById": "/api/services/{id}",
+      "getByCategory": "/api/services/category/{category}",
+      "create": "/api/services",
+      "delete": "/api/services/{id}"
+    }
+  }
+}
