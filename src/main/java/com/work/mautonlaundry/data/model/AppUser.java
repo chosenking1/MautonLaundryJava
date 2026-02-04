@@ -16,7 +16,7 @@ import java.util.List;
 @Setter
 @Validated
 @NoArgsConstructor
-@Table(name = "users")
+@Table(name = "users") // Changed table name back to "users"
 public class AppUser {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

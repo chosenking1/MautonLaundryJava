@@ -3,7 +3,7 @@ package com.work.mautonlaundry.services;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.model.Permission;
 import com.work.mautonlaundry.data.model.Role;
-import com.work.mautonlaundry.data.model.VerificationToken;
+import com.work.mautonlaundry.data.model.VerificationToken; // Corrected import
 import com.work.mautonlaundry.data.repository.RoleRepository;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.data.repository.VerificationTokenRepository;
@@ -26,6 +26,8 @@ import jakarta.validation.Valid;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.GrantedAuthority;
@@ -92,7 +94,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         user.setEmail(request.getEmail());
         
         // Assign default role
-        Role customerRole = roleRepository.findByName("CUSTOMER")
+        Role customerRole = roleRepository.findByName("USER")
                 .orElseThrow(() -> new RuntimeException("Default role 'CUSTOMER' not found in database"));
         user.setRole(customerRole);
         
@@ -102,6 +104,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
         auditService.logAction("CREATE", "USER", userDetails.getEmail());
         registerResponse.setEmail(userDetails.getEmail());
+        registerResponse.setMessage("Registration successful. Please check your email for verification."); // Set success message
+        
+        // Send email verification
+        sendEmailVerification(userDetails.getEmail());
         }
 
         return registerResponse;
@@ -127,6 +133,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         AppUser user = userRepository.findUserByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
+
+        log.debug("Loaded user: {} with password {}", username, user.getPassword()); // Added logging
+        log.debug("Password length: {}", user.getPassword().length());
 
         Set<GrantedAuthority> authorities = new HashSet<>();
         if (user.getRole() != null) {
@@ -241,7 +250,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     @Transactional
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_UPDATE')") // Changed from hasRole('ADMIN')
     public void updateUserRole(UpdateUserRoleRequest request) {
         // This method should be deprecated or updated to use RoleChangeRequest
         // For now, we'll implement direct update for ADMINs as a fallback
@@ -329,5 +338,15 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         tokenRepository.save(resetToken);
         
         return true;
+    }
+
+    @Override
+    public Page<FindUserResponse> getAllUsers(Pageable pageable) {
+        Page<AppUser> users = userRepository.findByDeletedFalse(pageable);
+        return users.map(user -> {
+            FindUserResponse response = new FindUserResponse();
+            mapper.map(user, response);
+            return response;
+        });
     }
 }

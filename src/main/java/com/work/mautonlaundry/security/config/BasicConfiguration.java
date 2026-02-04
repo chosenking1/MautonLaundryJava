@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.security.config;
 
+import com.work.mautonlaundry.security.filter.DynamicPermissionFilter;
 import com.work.mautonlaundry.security.filter.JwtAuthenticationEntryPoint;
 import com.work.mautonlaundry.security.filter.JwtAuthenticationFilter;
 import lombok.AllArgsConstructor;
@@ -29,6 +30,7 @@ public class BasicConfiguration{
     private UserDetailsService userDetailsService;
     private JwtAuthenticationEntryPoint authenticationEntryPoint;
     private JwtAuthenticationFilter authenticationFilter;
+    private DynamicPermissionFilter dynamicPermissionFilter;
 
 
 
@@ -41,21 +43,14 @@ public class BasicConfiguration{
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests((authorize) -> authorize
                         .requestMatchers("/register").permitAll()
-//                        .requestMatchers(HttpMethod.POST,"/addService").hasRole("ADMIN")
-
-                        .requestMatchers("/api/auth/login", "/register", "/v1/api/**", "/v2/api-docs", "/v3/api-docs", "/v3/api-docs/**", "/swagger-resources", "/swagger-resources/**", "/configuration/ui", "/configuration/security", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/admin").hasRole("ADMIN")
-                                .requestMatchers(HttpMethod.PUT,"/updateService").hasRole("ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/addresses").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/user").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers("/v1/api/**", "/v2/api-docs", "/v3/api-docs", "/v3/api-docs/**", "/swagger-resources", "/swagger-resources/**", "/configuration/ui", "/configuration/security", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(dynamicPermissionFilter, JwtAuthenticationFilter.class)
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(authenticationEntryPoint) )
                 .httpBasic(Customizer.withDefaults());

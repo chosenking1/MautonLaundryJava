@@ -28,6 +28,10 @@ public class LaundryServiceImpl implements LaundryService {
 
     @Override
     public ServiceResponse createService(CreateServiceRequest request) {
+        if (request.getCategory() == null || request.getCategory().trim().isEmpty()) {
+            throw new IllegalArgumentException("Service category cannot be null or empty");
+        }
+        
         Services service = new Services();
         service.setName(request.getName());
         service.setDescription(request.getDescription());

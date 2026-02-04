@@ -8,6 +8,8 @@ import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserRoleRequest;
 import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
@@ -32,6 +34,9 @@ public interface UserService {
     UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest request);
 
     void updateUserRole(UpdateUserRoleRequest request);
+    
+    // Get all users with pagination
+    Page<FindUserResponse> getAllUsers(Pageable pageable);
     
     // Email verification methods
     void sendEmailVerification(String email);

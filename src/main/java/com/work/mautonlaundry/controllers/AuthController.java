@@ -2,7 +2,9 @@ package com.work.mautonlaundry.controllers;
 
 import com.work.mautonlaundry.dtos.requests.PasswordResetRequest;
 import com.work.mautonlaundry.dtos.requests.VerifyEmailRequest;
+import com.work.mautonlaundry.dtos.requests.userrequests.RegisterUserRequest; // Import RegisterUserRequest
 import com.work.mautonlaundry.dtos.requests.userrequests.UserLoginRequest;
+import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse; // Import RegisterUserResponse
 import com.work.mautonlaundry.dtos.responses.userresponse.UserLoginResponse;
 import com.work.mautonlaundry.security.service.AuthService;
 import com.work.mautonlaundry.services.AuditService;
@@ -13,6 +15,7 @@ import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +34,21 @@ public class AuthController {
     
     @Autowired
     private AuditService auditService;
+
+    @PostMapping("/register")
+    public ResponseEntity<RegisterUserResponse> registerUser(@Valid @RequestBody RegisterUserRequest request) {
+        log.info("Registration attempt for email: {}", request.getEmail());
+        try {
+            RegisterUserResponse response = userService.registerUser(request);
+            auditService.logAction("REGISTER", "AUTH", request.getEmail());
+            log.info("Registration successful for email: {}", request.getEmail());
+            return new ResponseEntity<>(response, HttpStatus.CREATED);
+        } catch (Exception e) {
+            auditService.logAction("REGISTER_FAILED", "AUTH", request.getEmail());
+            log.warn("Registration failed for email: {} - {}", request.getEmail(), e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
 
     @PostMapping("/login")
     public ResponseEntity<UserLoginResponse> login(@Valid @RequestBody UserLoginRequest request) {

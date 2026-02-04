@@ -2,6 +2,8 @@ package com.work.mautonlaundry.data.repository;
 
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.model.Role;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +16,9 @@ public interface UserRepository extends JpaRepository<AppUser, String> {
     Optional<AppUser> findUserById(String id);
 
     boolean existsByEmail(String email);
+    
+    // Pagination support
+    Page<AppUser> findByDeletedFalse(Pageable pageable);
     
     // Admin dashboard queries
     Long countByDeletedFalse();

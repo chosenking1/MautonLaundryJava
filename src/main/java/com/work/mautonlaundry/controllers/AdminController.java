@@ -1,29 +1,64 @@
 package com.work.mautonlaundry.controllers;
 
-import com.work.mautonlaundry.data.repository.UserRepository;
-import com.work.mautonlaundry.dtos.responses.AdminDashboardResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.work.mautonlaundry.services.AnalyticsService;
+import com.work.mautonlaundry.services.UserService;
+import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasAuthority('ADMIN_DASHBOARD_READ')") // Updated to permission-based check
+@RequiredArgsConstructor
 public class AdminController {
+    
+    private final AnalyticsService analyticsService;
+    private final UserService userService;
 
-    @Autowired
-    private UserRepository userRepository;
+    @GetMapping("/users")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    public ResponseEntity<Page<FindUserResponse>> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<FindUserResponse> users = userService.getAllUsers(pageable);
+        return ResponseEntity.ok(users);
+    }
 
-    @GetMapping("/dashboard")
-    public ResponseEntity<AdminDashboardResponse> getDashboard() {
-        AdminDashboardResponse dashboard = new AdminDashboardResponse();
-        dashboard.setTotalUsers(userRepository.count());
-        dashboard.setActiveUsers(userRepository.countByDeletedFalse());
-        dashboard.setVerifiedUsers(userRepository.countByEmailVerifiedTrue());
-        
-        return ResponseEntity.ok(dashboard);
+    @GetMapping("/audit-logs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Page<Map<String, Object>>> getAuditLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Map<String, Object>> auditLogs = analyticsService.getAuditLogs(pageable);
+        return ResponseEntity.ok(auditLogs);
+    }
+
+    @GetMapping("/analytics/dashboard")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> getDashboardAnalytics() {
+        Map<String, Object> analytics = analyticsService.getDashboardAnalytics();
+        return ResponseEntity.ok(analytics);
+    }
+
+    @GetMapping("/analytics/users-by-role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Long>> getUsersByRole() {
+        Map<String, Long> usersByRole = analyticsService.getUsersByRole();
+        return ResponseEntity.ok(usersByRole);
+    }
+
+    @GetMapping("/analytics/monthly-stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> getMonthlyStats() {
+        Map<String, Object> monthlyStats = analyticsService.getMonthlyStats();
+        return ResponseEntity.ok(monthlyStats);
     }
 }

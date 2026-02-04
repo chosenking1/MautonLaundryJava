@@ -2,28 +2,45 @@ package com.work.mautonlaundry.data.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+import lombok.ToString;
+
+import java.util.Set;
 
 @Entity
-@NoArgsConstructor
-@AllArgsConstructor
 @Table(name = "permissions")
 @Data
+@NoArgsConstructor
+@EqualsAndHashCode(exclude = "roles")
+@ToString(exclude = "roles")
 public class Permission {
-
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(unique = true, nullable = false)
-    private String name;
-
+    
+    @Column(nullable = false, unique = true)
+    private String name; // Permission name like USER_READ, USER_CREATE, etc.
+    
+    @Column(nullable = false)
+    private String resource; // Resource type like USER, BOOKING, etc.
+    
+    @Column(nullable = false)
+    private String action; // Action type like CREATE, READ, UPDATE, DELETE
+    
+    @Column(nullable = false)
+    private String endpoint;
+    
+    @Column(nullable = false)
+    private String method; // GET, POST, PUT, DELETE, etc.
+    
+    @Column
     private String description;
-
+    
+    @ManyToMany(mappedBy = "permissions")
+    private Set<Role> roles;
+    
     @Column(nullable = false)
-    private String resource;
-
-    @Column(nullable = false)
-    private String action;
+    private Boolean active = true;
 }

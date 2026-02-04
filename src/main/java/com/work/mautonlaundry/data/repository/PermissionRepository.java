@@ -2,12 +2,19 @@ package com.work.mautonlaundry.data.repository;
 
 import com.work.mautonlaundry.data.model.Permission;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
-@Repository
-public interface PermissionRepository extends JpaRepository<Permission, String> {
+public interface PermissionRepository extends JpaRepository<Permission, Long> {
+    
     Optional<Permission> findByName(String name);
-    Optional<Permission> findByResourceAndAction(String resource, String action);
+    
+    Optional<Permission> findByEndpointAndMethodAndActiveTrue(String endpoint, String method);
+    
+    @Query("SELECT p FROM Permission p JOIN p.roles r WHERE p.endpoint = :endpoint AND p.method = :method AND r.name = :roleName AND p.active = true")
+    Optional<Permission> findByEndpointAndMethodAndRoleName(@Param("endpoint") String endpoint, 
+                                                           @Param("method") String method, 
+                                                           @Param("roleName") String roleName);
 }

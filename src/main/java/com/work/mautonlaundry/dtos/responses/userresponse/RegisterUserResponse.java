@@ -11,4 +11,5 @@ import lombok.Setter;
 @NoArgsConstructor
 public class RegisterUserResponse {
     private String email;
+    private String message; // Added message field
 }
