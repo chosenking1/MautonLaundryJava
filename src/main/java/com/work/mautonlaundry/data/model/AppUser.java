@@ -34,9 +34,6 @@ public class AppUser {
     @Column
     private String full_name;
 
-    @Column(nullable = false)
-    private String address; // Note: This might be redundant with the addresses list, but keeping for now
-
     @Column
     private String phone_number;
 
@@ -45,6 +42,9 @@ public class AppUser {
 
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean emailVerified = false;
+
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean isFirstLogin = true;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", nullable = false)

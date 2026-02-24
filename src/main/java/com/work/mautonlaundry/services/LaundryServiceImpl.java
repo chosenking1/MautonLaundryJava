@@ -1,8 +1,10 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.ServicePrice;
-import com.work.mautonlaundry.data.model.enums.ServiceType;
+import com.work.mautonlaundry.data.model.Category;
+import com.work.mautonlaundry.data.model.ServicePricing;
 import com.work.mautonlaundry.data.model.Services;
+import com.work.mautonlaundry.data.repository.CategoryRepository;
+import com.work.mautonlaundry.data.repository.ServicePricingRepository;
 import com.work.mautonlaundry.data.repository.ServiceRepository;
 import com.work.mautonlaundry.dtos.requests.servicerequests.CreateServiceRequest;
 import com.work.mautonlaundry.dtos.requests.servicerequests.UpdateServiceRequest;
@@ -11,7 +13,9 @@ import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundExcept
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,27 +25,32 @@ import java.util.stream.Collectors;
 public class LaundryServiceImpl implements LaundryService {
     
     private final ServiceRepository serviceRepository;
+    private final CategoryRepository categoryRepository;
+    private final ServicePricingRepository servicePricingRepository;
     private final ModelMapper mapper = new ModelMapper();
     
     @Autowired
     private AuditService auditService;
 
+    @Value("${app.base-url}")
+    private String baseUrl;
+
     @Override
     public ServiceResponse createService(CreateServiceRequest request) {
-        if (request.getCategory() == null || request.getCategory().trim().isEmpty()) {
-            throw new IllegalArgumentException("Service category cannot be null or empty");
-        }
-        
         Services service = new Services();
         service.setName(request.getName());
         service.setDescription(request.getDescription());
-        service.setCategory(ServiceType.valueOf(request.getCategory().toUpperCase()));
+        service.setImagePath(request.getImagePath());
         
-        ServicePrice price = new ServicePrice();
-        price.setPrice(request.getPrice());
-        price.setWhite(request.getWhite());
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("Category not found"));
         
-        service.setServicePrice(price);
+        if (!category.getActive()) {
+            throw new RuntimeException("Cannot create service for inactive category");
+        }
+        service.setCategory(category);
+        
+        // Pricing logic removed as it's handled via ServicePricing entity now
         
         Services savedService = serviceRepository.save(service);
         auditService.logAction("CREATE", "SERVICE", savedService.getId().toString());
@@ -51,30 +60,27 @@ public class LaundryServiceImpl implements LaundryService {
 
     @Override
     public ServiceResponse updateService(Long id, UpdateServiceRequest request) {
-        Services service = serviceRepository.findByIdAndDeletedFalse(id)
+        Services service = serviceRepository.findByIdAndDeletedFalseAndActiveTrue(id)
                 .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
 
-        if (request.getService_name() != null) {
-            service.setName(request.getService_name());
+        if (request.getName() != null) {
+            service.setName(request.getName());
         }
-        if (request.getService_details() != null) {
-            service.setDescription(request.getService_details());
+        if (request.getDescription() != null) {
+            service.setDescription(request.getDescription());
         }
-        if (request.getType_of_service() != null) {
-            service.setCategory(request.getType_of_service());
+        if (request.getImagePath() != null) {
+            service.setImagePath(request.getImagePath());
         }
-        
-        ServicePrice price = service.getServicePrice();
-        if (price == null) {
-            price = new ServicePrice();
-            service.setServicePrice(price);
-        }
-        
-        if (request.getService_price() > 0) {
-            price.setPrice((double) request.getService_price());
-        }
-        if (request.getService_price_white() > 0) {
-            price.setWhite((double) request.getService_price_white());
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new RuntimeException("Category not found"));
+            
+            if (!category.getActive()) {
+                throw new RuntimeException("Cannot update service to inactive category");
+            }
+            
+            service.setCategory(category);
         }
         
         Services savedService = serviceRepository.save(service);
@@ -85,7 +91,7 @@ public class LaundryServiceImpl implements LaundryService {
 
     @Override
     public List<ServiceResponse> getAllServices() {
-        return serviceRepository.findByDeletedFalse()
+        return serviceRepository.findByDeletedFalseAndActiveTrue()
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -93,15 +99,14 @@ public class LaundryServiceImpl implements LaundryService {
 
     @Override
     public ServiceResponse getServiceById(Long id) {
-        Services service = serviceRepository.findByIdAndDeletedFalse(id)
+        Services service = serviceRepository.findByIdAndDeletedFalseAndActiveTrue(id)
                 .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
         return mapToResponse(service);
     }
 
     @Override
-    public List<ServiceResponse> getServicesByCategory(String category) {
-        ServiceType serviceType = ServiceType.valueOf(category.toUpperCase());
-        return serviceRepository.findByCategoryAndDeletedFalse(serviceType)
+    public List<ServiceResponse> getServicesByCategory(Long categoryId) {
+        return serviceRepository.findByCategoryIdAndDeletedFalseAndActiveTrue(categoryId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -109,7 +114,7 @@ public class LaundryServiceImpl implements LaundryService {
 
     @Override
     public void deleteService(Long id) {
-        Services service = serviceRepository.findByIdAndDeletedFalse(id)
+        Services service = serviceRepository.findByIdAndDeletedFalseAndActiveTrue(id)
                 .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
         service.setDeleted(true);
         serviceRepository.save(service);
@@ -121,11 +126,24 @@ public class LaundryServiceImpl implements LaundryService {
         response.setId(service.getId());
         response.setName(service.getName());
         response.setDescription(service.getDescription());
-        response.setCategory(service.getCategory().name());
-        if (service.getServicePrice() != null) {
-            response.setPrice(service.getServicePrice().getPrice());
-            response.setWhite(service.getServicePrice().getWhite());
+        if (service.getCategory() != null) {
+            response.setCategoryName(service.getCategory().getName());
         }
+        
+        if (service.getImagePath() != null && !service.getImagePath().isEmpty()) {
+            // Extract filename from path (remove "uploads/" prefix if present)
+            String filename = service.getImagePath();
+            if (filename.startsWith("uploads/")) {
+                filename = filename.substring(8);
+            }
+            String imageUrl = "http://localhost:8079/api/v1/images/" + filename;
+            response.setImagePath(imageUrl);
+        }
+        
+        // Pricing mapping removed as it requires fetching ServicePricing list
+        List<ServicePricing> pricing = servicePricingRepository.findByServiceIdAndActiveTrue(service.getId());
+        response.setPricing(pricing);
+        
         return response;
     }
 }

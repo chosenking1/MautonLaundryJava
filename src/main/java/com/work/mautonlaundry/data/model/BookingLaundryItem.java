@@ -8,7 +8,7 @@ import lombok.Setter;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "booking_laundry_items")
+@Table(name = "booking_service_items")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,23 +22,18 @@ public class BookingLaundryItem {
     private Booking booking;
 
     @ManyToOne
-    @JoinColumn(name = "item_id", nullable = false)
-    private LaundryItemCatalog item;
+    @JoinColumn(name = "service_id", nullable = false)
+    private Services service;
+
+    @Column(name = "item_type", nullable = false)
+    private String itemType; // e.g., "SHIRT_WHITE", "OFFICE_CLEANING"
 
     @Column(nullable = false)
     private Integer quantity;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "color_type", nullable = false)
-    private ColorType colorType;
 
     @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice; // Snapshot price at booking time
 
     @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice; // quantity * unitPrice
-
-    public enum ColorType {
-        WHITE, COLORED
-    }
 }

@@ -1,10 +1,7 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.BookingLaundryItem;
-import com.work.mautonlaundry.data.model.LaundryItemCatalog;
-import com.work.mautonlaundry.data.model.PricingConfig;
-import com.work.mautonlaundry.data.repository.LaundryItemCatalogRepository;
-import com.work.mautonlaundry.data.repository.PricingConfigRepository;
+import com.work.mautonlaundry.data.model.*;
+import com.work.mautonlaundry.data.repository.*;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.BookingItemRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,27 +16,29 @@ import java.util.Map;
 public class PricingEngine {
     
     private final PricingConfigRepository pricingConfigRepository;
-    private final LaundryItemCatalogRepository catalogRepository;
+    private final ServiceRepository serviceRepository;
+    private final ServicePricingRepository servicePricingRepository;
 
     public BigDecimal calculateBookingPrice(List<BookingItemRequest> items, boolean express, BigDecimal deliveryDistance) {
-        BigDecimal itemsTotal = calculateItemsTotal(items);
+        BigDecimal itemsTotal = calculateServiceItemsTotal(items);
         BigDecimal deliveryFee = calculateDeliveryFee(itemsTotal, deliveryDistance);
         BigDecimal expressFee = express ? getExpressFee() : BigDecimal.ZERO;
         
         return itemsTotal.add(deliveryFee).add(expressFee);
     }
 
-    private BigDecimal calculateItemsTotal(List<BookingItemRequest> items) {
+    private BigDecimal calculateServiceItemsTotal(List<BookingItemRequest> items) {
         BigDecimal total = BigDecimal.ZERO;
         
         for (BookingItemRequest item : items) {
-            LaundryItemCatalog catalogItem = catalogRepository.findByIdAndIsActiveTrue(item.getItemId())
-                    .orElseThrow(() -> new RuntimeException("Item not found: " + item.getItemId()));
+            Services service = serviceRepository.findByIdAndActiveTrue(item.getServiceId())
+                    .orElseThrow(() -> new RuntimeException("Service not found: " + item.getServiceId()));
             
-            BigDecimal unitPrice = "WHITE".equals(item.getColorType()) ? 
-                    catalogItem.getBasePriceWhite() : catalogItem.getBasePriceColored();
+            ServicePricing pricing = servicePricingRepository
+                    .findByServiceAndItemTypeAndActiveTrue(service, item.getItemType())
+                    .orElseThrow(() -> new RuntimeException("Pricing not found for service " + service.getName() + " and item type " + item.getItemType()));
             
-            total = total.add(unitPrice.multiply(BigDecimal.valueOf(item.getQuantity())));
+            total = total.add(pricing.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
         }
         
         return total;

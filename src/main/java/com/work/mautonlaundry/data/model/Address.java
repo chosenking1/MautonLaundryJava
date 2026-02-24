@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.data.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -28,15 +29,16 @@ public class Address {
     private Double longitude;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    @JsonIgnore
     private AppUser user;
 
     @Column
-    private Boolean isDefault; // To mark the default address
+    private Boolean isDefault;
     @Column
-    private Boolean deleted; // To mark if the address is deleted
+    private Boolean deleted;
     @Column
-    private LocalDateTime lastUsed; // To track the last used time
+    private LocalDateTime lastUsed;
 
     @CreationTimestamp
     @Column

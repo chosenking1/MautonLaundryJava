@@ -1,9 +1,11 @@
 package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.AppUser;
+import com.work.mautonlaundry.data.model.Address;
 import com.work.mautonlaundry.data.model.Permission;
 import com.work.mautonlaundry.data.model.Role;
 import com.work.mautonlaundry.data.model.VerificationToken; // Corrected import
+import com.work.mautonlaundry.data.repository.AddressRepository;
 import com.work.mautonlaundry.data.repository.RoleRepository;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.data.repository.VerificationTokenRepository;
@@ -49,6 +51,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
 
     private final UserRepository userRepository;
+    private final AddressRepository addressRepository;
     private final RoleRepository roleRepository;
     private final VerificationTokenRepository tokenRepository;
     private final EmailService emailService;
@@ -64,10 +67,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private AuditService auditService;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, RoleRepository roleRepository, VerificationTokenRepository tokenRepository,
+    public UserServiceImpl(UserRepository userRepository, AddressRepository addressRepository, RoleRepository roleRepository, VerificationTokenRepository tokenRepository,
                            EmailService emailService, TokenGenerator tokenGenerator, CacheManager cacheManager,
                            @Lazy AuthService authService, PasswordEncoder passwordEncoder, ModelMapper mapper) {
         this.userRepository = userRepository;
+        this.addressRepository = addressRepository;
         this.roleRepository = roleRepository;
         this.tokenRepository = tokenRepository;
         this.emailService = emailService;
@@ -90,7 +94,6 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         }
         else{
         user.setFull_name(request.getFirstname() +" "+ request.getSecond_name());
-        user.setAddress(request.getAddress());
         user.setEmail(request.getEmail());
         
         // Assign default role
@@ -100,14 +103,35 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         
         user.setPassword(setPassword(request.getPassword()));
         user.setPhone_number(request.getPhone_number());
-        AppUser userDetails = userRepository.save(user);
+        
+        // Save user first
+        AppUser savedUser = userRepository.save(user);
+        
+        // Create address only if street or city is provided
+        if ((request.getStreet() != null && !request.getStreet().trim().isEmpty()) || 
+            (request.getCity() != null && !request.getCity().trim().isEmpty())) {
+            Address address = new Address();
+            address.setUser(savedUser);
+            address.setStreet(request.getStreet());
+            address.setStreet_number(request.getStreetNumber());
+            address.setCity(request.getCity());
+            address.setState(request.getState());
+            address.setZip(request.getZip());
+            address.setCountry(request.getCountry());
+            address.setLatitude(request.getLatitude());
+            address.setLongitude(request.getLongitude());
+            address.setIsDefault(true);
+            address.setDeleted(false);
+            
+            addressRepository.save(address);
+        }
 
-        auditService.logAction("CREATE", "USER", userDetails.getEmail());
-        registerResponse.setEmail(userDetails.getEmail());
-        registerResponse.setMessage("Registration successful. Please check your email for verification."); // Set success message
+        auditService.logAction("CREATE", "USER", savedUser.getEmail());
+        registerResponse.setEmail(savedUser.getEmail());
+        registerResponse.setMessage("Registration successful. Please check your email for verification.");
         
         // Send email verification
-        sendEmailVerification(userDetails.getEmail());
+        sendEmailVerification(savedUser.getEmail());
         }
 
         return registerResponse;
@@ -233,7 +257,6 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
                 // Update only the necessary fields
                 existingUser.setFull_name(user.getFirstname() + " " + user.getSecond_name());
-                existingUser.setAddress(user.getAddress());
                 existingUser.setPhone_number(user.getPhone_number());
 
                 // Save the updated user
@@ -346,7 +369,24 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         return users.map(user -> {
             FindUserResponse response = new FindUserResponse();
             mapper.map(user, response);
+            // Add role information
+            if (user.getRole() != null) {
+                response.setUserRole(user.getRole().getName());
+            }
             return response;
         });
+    }
+    
+    @Override
+    public FindUserResponse getCurrentUser() {
+        AppUser currentUser = SecurityUtil.getCurrentUser()
+                .orElseThrow(() -> new SecurityException("User not authenticated"));
+        
+        FindUserResponse response = new FindUserResponse();
+        mapper.map(currentUser, response);
+        if (currentUser.getRole() != null) {
+            response.setUserRole(currentUser.getRole().getName());
+        }
+        return response;
     }
 }

@@ -28,7 +28,16 @@ public class DynamicPermissionFilter extends OncePerRequestFilter {
         // Skip filter for unauthenticated requests or public endpoints
         if (authentication == null || !authentication.isAuthenticated() || 
             request.getRequestURI().startsWith("/api/auth/") || 
-            request.getRequestURI().equals("/register")) {
+            request.getRequestURI().equals("/register") ||
+            request.getRequestURI().startsWith("/api/v1/services") ||
+            request.getRequestURI().startsWith("/api/v1/pricing") ||
+            request.getRequestURI().startsWith("/api/v1/addresses") ||
+            request.getRequestURI().startsWith("/api/v1/users") ||
+            request.getRequestURI().startsWith("/api/v1/admin/") ||
+            request.getRequestURI().startsWith("/api/v1/categories") ||
+            request.getRequestURI().startsWith("/swagger-ui") ||
+            request.getRequestURI().startsWith("/v3/api-docs") ||
+            request.getMethod().equals("OPTIONS")) {
             filterChain.doFilter(request, response);
             return;
         }

@@ -45,4 +45,7 @@ public interface UserService {
     // Password reset methods
     void sendPasswordResetEmail(String email);
     boolean resetPassword(String token, String newPassword);
+    
+    // Current user method
+    FindUserResponse getCurrentUser();
 }

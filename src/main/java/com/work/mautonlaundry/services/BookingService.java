@@ -8,13 +8,15 @@ import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingDetailsRespo
 import com.work.mautonlaundry.dtos.responses.bookingresponse.CreateBookingResponse;
 import com.work.mautonlaundry.security.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -24,27 +26,34 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
-    private final LaundryItemCatalogRepository catalogRepository;
-    private final PricingEngine pricingEngine;
+    private final ServiceRepository serviceRepository;
+    private final ServicePricingRepository servicePricingRepository;
     private final AuditService auditService;
 
     @Transactional
     public CreateBookingResponse createBooking(CreateBookingRequest request) {
-        if (!"LAUNDRY".equals(request.getBookingType())) {
-            throw new RuntimeException("Booking type not supported yet: " + request.getBookingType());
-        }
-        
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
+        
+        // Debug: Print what frontend is sending
+        System.out.println("=== BOOKING REQUEST DEBUG ===");
+        System.out.println("Request: " + request);
+        System.out.println("Items count: " + (request.getItems() != null ? request.getItems().size() : "null"));
+        if (request.getItems() != null) {
+            for (int i = 0; i < request.getItems().size(); i++) {
+                BookingItemRequest item = request.getItems().get(i);
+                System.out.println("Item " + i + ": serviceId=" + item.getServiceId() + ", itemType=" + item.getItemType() + ", quantity=" + item.getQuantity());
+            }
+        }
+        System.out.println("==============================");
         
         Address pickupAddress = addressRepository.findById(request.getPickupAddressId())
                 .orElseThrow(() -> new RuntimeException("Address not found"));
         
-        // Calculate pricing
-        BigDecimal totalPrice = pricingEngine.calculateBookingPrice(request.getItems(), request.getExpress(), BigDecimal.ZERO);
+        // Calculate pricing using service-based pricing
+        BigDecimal totalPrice = calculateServiceBasedPrice(request.getItems(), request.getExpress());
         
-        // Create booking
+        // Create booking with items
         Booking booking = new Booking();
-        booking.setId(UUID.randomUUID().toString());
         booking.setUser(currentUser);
         booking.setBookingType(Booking.BookingType.LAUNDRY);
         booking.setPickupAddress(pickupAddress);
@@ -53,12 +62,15 @@ public class BookingService {
         booking.setTrackingNumber(generateTrackingNumber());
         booking.setReturnDate(calculateReturnDate(request.getExpress()));
         
+        // Create and add booking items
+        createBookingItems(booking, request.getItems());
+        
+        // Save everything at once
         Booking savedBooking = bookingRepository.save(booking);
         
-        // Create booking items
-        createBookingItems(savedBooking, request.getItems());
-        
         auditService.logAction("CREATE", "BOOKING", savedBooking.getId());
+        
+        System.out.println("Booking created successfully: " + savedBooking.getId()); // Debug
         
         // Map to response DTO
         CreateBookingResponse response = new CreateBookingResponse();
@@ -67,6 +79,8 @@ public class BookingService {
         response.setTotalPrice(savedBooking.getTotalPrice());
         response.setReturnDate(savedBooking.getReturnDate());
         response.setStatus(savedBooking.getStatus().name());
+        
+        System.out.println("Returning response: " + response); // Debug
         
         return response;
     }
@@ -95,7 +109,7 @@ public class BookingService {
         
         // Map address
         BookingDetailsResponse.AddressInfo addressInfo = new BookingDetailsResponse.AddressInfo();
-        addressInfo.setLabel("Address"); // Default label since Address doesn't have label field
+        addressInfo.setLabel("Address");
         addressInfo.setLine1(booking.getPickupAddress().getStreet() + " " + booking.getPickupAddress().getStreet_number());
         addressInfo.setCity(booking.getPickupAddress().getCity());
         response.setPickupAddress(addressInfo);
@@ -103,12 +117,44 @@ public class BookingService {
         return response;
     }
 
+    public Page<BookingDetailsResponse> getUserBookings(Pageable pageable) {
+        AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
+        Page<Booking> bookings = bookingRepository.findByUserAndDeletedFalse(currentUser, pageable);
+        
+        return bookings.map(booking -> {
+            BookingDetailsResponse response = new BookingDetailsResponse();
+            response.setId(booking.getId());
+            response.setTrackingNumber(booking.getTrackingNumber());
+            response.setBookingType(booking.getBookingType().name());
+            response.setStatus(booking.getStatus().name());
+            response.setTotalPrice(booking.getTotalPrice());
+            response.setReturnDate(booking.getReturnDate());
+            response.setCreatedAt(booking.getCreatedAt());
+            return response;
+        });
+    }
+
+    public Page<BookingDetailsResponse> getAllBookings(Pageable pageable) {
+        Page<Booking> bookings = bookingRepository.findByDeletedFalse(pageable);
+        
+        return bookings.map(booking -> {
+            BookingDetailsResponse response = new BookingDetailsResponse();
+            response.setId(booking.getId());
+            response.setTrackingNumber(booking.getTrackingNumber());
+            response.setBookingType(booking.getBookingType().name());
+            response.setStatus(booking.getStatus().name());
+            response.setTotalPrice(booking.getTotalPrice());
+            response.setReturnDate(booking.getReturnDate());
+            response.setCreatedAt(booking.getCreatedAt());
+            return response;
+        });
+    }
+
     @Transactional
     public Booking updateBookingStatus(String bookingId, Booking.BookingStatus newStatus) {
         Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
         
-        // Validate state transition
         validateStatusTransition(booking.getStatus(), newStatus);
         
         Booking.BookingStatus oldStatus = booking.getStatus();
@@ -127,32 +173,59 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
         
-        // Customer edits allowed only before PICKED_UP
         return booking.getStatus().ordinal() < Booking.BookingStatus.PICKED_UP.ordinal();
     }
 
     private void validateStatusTransition(Booking.BookingStatus current, Booking.BookingStatus next) {
-        // Implement state transition validation logic
         if (current == Booking.BookingStatus.DELIVERED && next != Booking.BookingStatus.DELIVERED) {
             throw new RuntimeException("Cannot change status after delivery");
         }
     }
 
+    private BigDecimal calculateServiceBasedPrice(List<BookingItemRequest> items, boolean express) {
+        BigDecimal total = BigDecimal.ZERO;
+        
+        for (BookingItemRequest item : items) {
+            Services service = serviceRepository.findByIdAndActiveTrue(item.getServiceId())
+                    .orElseThrow(() -> new RuntimeException("Service with ID " + item.getServiceId() + " not found or inactive"));
+            
+            ServicePricing pricing = servicePricingRepository
+                    .findByServiceAndItemTypeAndActiveTrue(service, item.getItemType())
+                    .orElseThrow(() -> new RuntimeException("Pricing not found for service " + service.getName() + " and item type " + item.getItemType()));
+            
+            BigDecimal itemTotal = pricing.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+            total = total.add(itemTotal);
+        }
+        
+        if (express) {
+            total = total.multiply(BigDecimal.valueOf(1.5));
+        }
+        
+        return total;
+    }
+
     private void createBookingItems(Booking booking, List<BookingItemRequest> items) {
         for (BookingItemRequest itemData : items) {
-            LaundryItemCatalog catalogItem = catalogRepository.findByIdAndIsActiveTrue(itemData.getItemId())
-                    .orElseThrow(() -> new RuntimeException("Item not found"));
+            Services service = serviceRepository.findByIdAndActiveTrue(itemData.getServiceId())
+                    .orElseThrow(() -> new RuntimeException("Service with ID " + itemData.getServiceId() + " not found or inactive"));
             
-            BigDecimal unitPrice = "WHITE".equals(itemData.getColorType()) ? 
-                    catalogItem.getBasePriceWhite() : catalogItem.getBasePriceColored();
+            ServicePricing pricing = servicePricingRepository
+                    .findByServiceAndItemTypeAndActiveTrue(service, itemData.getItemType())
+                    .orElseThrow(() -> new RuntimeException("Pricing not found for service " + service.getName() + " and item type " + itemData.getItemType()));
             
             BookingLaundryItem bookingItem = new BookingLaundryItem();
             bookingItem.setBooking(booking);
-            bookingItem.setItem(catalogItem);
+            bookingItem.setService(service);
+            bookingItem.setItemType(itemData.getItemType());
             bookingItem.setQuantity(itemData.getQuantity());
-            bookingItem.setColorType(BookingLaundryItem.ColorType.valueOf(itemData.getColorType()));
-            bookingItem.setUnitPrice(unitPrice);
-            bookingItem.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(itemData.getQuantity())));
+            bookingItem.setUnitPrice(pricing.getPrice());
+            bookingItem.setTotalPrice(pricing.getPrice().multiply(BigDecimal.valueOf(itemData.getQuantity())));
+            
+            // Add to booking's items list
+            if (booking.getItems() == null) {
+                booking.setItems(new ArrayList<>());
+            }
+            booking.getItems().add(bookingItem);
         }
     }
 

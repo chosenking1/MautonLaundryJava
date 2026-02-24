@@ -11,6 +11,6 @@ public interface LaundryService {
     ServiceResponse updateService(Long id, UpdateServiceRequest request);
     List<ServiceResponse> getAllServices();
     ServiceResponse getServiceById(Long id);
-    List<ServiceResponse> getServicesByCategory(String category);
+    List<ServiceResponse> getServicesByCategory(Long categoryId);
     void deleteService(Long id);
 }

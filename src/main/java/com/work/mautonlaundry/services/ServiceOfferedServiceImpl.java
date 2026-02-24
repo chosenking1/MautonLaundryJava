@@ -1,8 +1,8 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.ServicePrice;
+import com.work.mautonlaundry.data.model.Category;
 import com.work.mautonlaundry.data.model.Services;
-import com.work.mautonlaundry.data.model.enums.ServiceType;
+import com.work.mautonlaundry.data.repository.CategoryRepository;
 import com.work.mautonlaundry.data.repository.ServiceRepository;
 import com.work.mautonlaundry.dtos.requests.servicerequests.AddServiceRequest;
 import com.work.mautonlaundry.dtos.requests.servicerequests.UpdateServiceRequest;
@@ -19,50 +19,51 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ServiceOfferedServiceImpl implements ServiceOfferedService {
     private final ServiceRepository serviceRepository;
+    private final CategoryRepository categoryRepository;
 
     @Autowired
     private ModelMapper mapper;
 
-    public ServiceOfferedServiceImpl(ServiceRepository serviceRepository) {
+    public ServiceOfferedServiceImpl(ServiceRepository serviceRepository, CategoryRepository categoryRepository) {
         this.serviceRepository = serviceRepository;
+        this.categoryRepository = categoryRepository;
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public AddServiceResponse addService(AddServiceRequest request) {
-        Services service = new Services();
-        service.setName(request.getService_name());
-        service.setCategory(request.getType_of_service());
-        service.setDescription(request.getService_details());
-
-        ServicePrice price = new ServicePrice();
-        price.setPrice(Double.valueOf(request.getService_price()));
-        price.setWhite(Double.valueOf(request.getService_price_white()));
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new IllegalArgumentException("Category not found"));
         
-        service.setServicePrice(price);
+        Services service = new Services();
+        service.setName(request.getName());
+        service.setCategory(category);
+        service.setDescription(request.getDescription());
+        service.setImagePath(request.getImagePath());
+
         Services savedService = serviceRepository.save(service);
 
         AddServiceResponse response = new AddServiceResponse();
         response.setId(savedService.getId());
-        response.setService_name(savedService.getName());
-        response.setService_details(savedService.getDescription());
-        response.setType_of_service(ServiceType.valueOf(savedService.getCategory().name()));
-        response.setServicePrice(savedService.getServicePrice());
+        response.setName(savedService.getName());
+        response.setDescription(savedService.getDescription());
+        response.setCategoryName(savedService.getCategory().getName());
+        response.setImagePath(savedService.getImagePath());
 
         return response;
     }
 
     @Override
     public ViewServiceResponse getServiceById(Long id) {
-        Services service = serviceRepository.findByIdAndDeletedFalse(id)
+        Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
         
         ViewServiceResponse response = new ViewServiceResponse();
         response.setId(service.getId());
-        response.setService_name(service.getName());
-        response.setService_details(service.getDescription());
-        response.setType_of_service(ServiceType.valueOf(service.getCategory().name()));
-        response.setServicePrice(service.getServicePrice());
+        response.setName(service.getName());
+        response.setDescription(service.getDescription());
+        response.setCategoryName(service.getCategory().getName());
+        response.setImagePath(service.getImagePath());
         
         return response;
     }
@@ -75,24 +76,32 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService {
     @PreAuthorize("hasRole('ADMIN')")
     @Override
     public UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request) {
-        Services existingService = serviceRepository.findByIdAndDeletedFalse(request.getId())
+        Services existingService = serviceRepository.findById(request.getId())
                 .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
 
-        existingService.setName(request.getService_name());
-        existingService.setDescription(request.getService_details());
-        existingService.setCategory(request.getType_of_service());
-        
-        ServicePrice price = existingService.getServicePrice();
-        price.setPrice(Double.valueOf(request.getService_price()));
-        price.setWhite(Double.valueOf(request.getService_price_white()));
+        if (request.getName() != null) {
+            existingService.setName(request.getName());
+        }
+        if (request.getDescription() != null) {
+            existingService.setDescription(request.getDescription());
+        }
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+            existingService.setCategory(category);
+        }
+        if (request.getImagePath() != null) {
+            existingService.setImagePath(request.getImagePath());
+        }
 
         Services updatedService = serviceRepository.save(existingService);
         
         UpdateServiceResponse response = new UpdateServiceResponse();
         response.setId(updatedService.getId());
-        response.setService_name(updatedService.getName());
-        response.setService_details(updatedService.getDescription());
-        response.setType_of_service(ServiceType.valueOf(updatedService.getCategory().name()));
+        response.setName(updatedService.getName());
+        response.setDescription(updatedService.getDescription());
+        response.setCategoryName(updatedService.getCategory().getName());
+        response.setImagePath(updatedService.getImagePath());
         
         return response;
     }
@@ -100,7 +109,7 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService {
     @PreAuthorize("hasRole('ADMIN')")
     @Override
     public void deleteServiceById(Long id) {
-        Services service = serviceRepository.findByIdAndDeletedFalse(id)
+        Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> new ServiceNotFoundException("Service not found"));
         
         service.setDeleted(true);
@@ -110,7 +119,6 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService {
     @PreAuthorize("hasRole('ADMIN')")
     @Override
     public void deleteServiceByName(String serviceName) {
-        // This method would need a repository method to find by name
         throw new UnsupportedOperationException("Delete by name not implemented");
     }
 }

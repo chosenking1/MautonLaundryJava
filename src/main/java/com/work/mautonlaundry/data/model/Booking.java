@@ -66,7 +66,7 @@ public class Booking {
     private Payment payment;
 
     public enum BookingType {
-        LAUNDRY, CLEANING
+        LAUNDRY, CLEANING, SERVICE // Added generic SERVICE type
     }
 
     public enum BookingStatus {

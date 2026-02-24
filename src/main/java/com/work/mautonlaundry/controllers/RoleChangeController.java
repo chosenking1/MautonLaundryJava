@@ -1,14 +1,16 @@
 package com.work.mautonlaundry.controllers;
 
 import com.work.mautonlaundry.data.model.RoleChangeRequest;
+import com.work.mautonlaundry.dtos.requests.rolechangerequests.CreateRoleChangeRequest;
+import com.work.mautonlaundry.dtos.requests.rolechangerequests.UpdateRoleChangeStatusRequest;
 import com.work.mautonlaundry.services.RoleChangeService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/admin/role-requests")
@@ -20,9 +22,9 @@ public class RoleChangeController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('ROLE_CHANGE_CREATE')")
-    public ResponseEntity<RoleChangeRequest> createRequest(@RequestBody Map<String, String> request) {
-        String userId = request.get("userId");
-        String roleName = request.get("requestedRole");
+    public ResponseEntity<RoleChangeRequest> createRequest(@Valid @RequestBody CreateRoleChangeRequest request) {
+        String userId = request.getUserId();
+        String roleName = request.getRequestedRole();
         
         RoleChangeRequest created = roleChangeService.createRequest(userId, roleName);
         return ResponseEntity.ok(created);
@@ -32,9 +34,9 @@ public class RoleChangeController {
     @PreAuthorize("hasAuthority('ROLE_CHANGE_UPDATE')")
     public ResponseEntity<RoleChangeRequest> updateRequestStatus(
             @PathVariable Long requestId,
-            @RequestBody Map<String, String> request) {
+            @Valid @RequestBody UpdateRoleChangeStatusRequest request) {
         
-        String status = request.get("status");
+        String status = request.getStatus();
         
         if ("APPROVED".equals(status)) {
             return ResponseEntity.ok(roleChangeService.approveRequest(requestId));

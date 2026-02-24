@@ -11,12 +11,10 @@ public class CreateServiceRequest {
     
     private String description;
     
-    @NotBlank
-    private String category;
-    
     @NotNull
-    private Double price;
+    private Long categoryId;
     
-    @NotNull
-    private Double white;
+    private String imagePath;
+    
+    private String estimatedDuration;
 }

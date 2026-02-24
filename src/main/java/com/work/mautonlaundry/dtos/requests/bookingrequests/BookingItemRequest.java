@@ -7,11 +7,11 @@ import lombok.Data;
 @Data
 public class BookingItemRequest {
     @NotNull
-    private Long itemId;
+    private Long serviceId;  // ID of the service (e.g., laundry, house cleaning)
+    
+    @NotNull
+    private String itemType; // e.g., "SHIRT_WHITE", "OFFICE_CLEANING", "DEEP_CLEAN"
     
     @Min(1)
     private Integer quantity;
-    
-    @NotNull
-    private String colorType;
 }

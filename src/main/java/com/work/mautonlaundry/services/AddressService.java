@@ -92,4 +92,17 @@ public class AddressService {
         address.setDeleted(true);
         addressRepository.save(address);
     }
+
+    @Transactional
+    public void setDefaultAddress(String addressId) {
+        AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
+        
+        // Clear existing default
+        addressRepository.clearDefaultForUser(currentUser.getId());
+        
+        // Set new default
+        Address address = getAddress(addressId);
+        address.setIsDefault(true);
+        addressRepository.save(address);
+    }
 }

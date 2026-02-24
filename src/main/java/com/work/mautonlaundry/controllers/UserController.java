@@ -2,14 +2,15 @@ package com.work.mautonlaundry.controllers;
 
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.repository.UserRepository;
+import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserProfileRequest;
+import com.work.mautonlaundry.dtos.responses.userresponse.CurrentUserResponse;
+import com.work.mautonlaundry.security.util.SecurityUtil;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -18,64 +19,37 @@ public class UserController {
     
     private final UserRepository userRepository;
 
-    @GetMapping("/getUser/{email}")
-    @PreAuthorize("hasAuthority('USER_READ') or #email == authentication.principal.username")
-    public ResponseEntity<AppUser> getUserByEmail(@PathVariable String email) {
-        AppUser appUser = userRepository.findUserByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return ResponseEntity.ok(appUser);
-    }
-
-    @GetMapping("/{userId}")
-    @PreAuthorize("hasAuthority('USER_READ') or #userId == authentication.principal.username")
-    public ResponseEntity<AppUser> getUserById(@PathVariable String userId) {
-        AppUser appUser = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return ResponseEntity.ok(appUser);
-    }
-
-    @GetMapping("/{userId}/role")
-    @PreAuthorize("hasAuthority('USER_READ') or #userId == authentication.principal.username")
-    public ResponseEntity<Map<String, Object>> getUserRole(@PathVariable String userId) {
-        AppUser appUser = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    @GetMapping("/me")
+    public ResponseEntity<CurrentUserResponse> getCurrentUser() {
+        AppUser currentUser = SecurityUtil.getCurrentUser()
+                .orElseThrow(() -> new RuntimeException("User not authenticated"));
         
-        // Access the single role directly
-        String roleName = appUser.getRole() != null ? appUser.getRole().getName() : "NO_ROLE";
-        
-        Map<String, Object> response = Map.of(
-            "userId", appUser.getId(),
-            "role", roleName, // Changed from "roles" to "role" and now a single string
-            "roleStatus", "ACTIVE"
-        );
+        CurrentUserResponse response = new CurrentUserResponse();
+        response.setId(currentUser.getId());
+        response.setEmail(currentUser.getEmail());
+        response.setFullName(currentUser.getFull_name());
+        response.setPhoneNumber(currentUser.getPhone_number());
+        response.setRole(currentUser.getRole() != null ? currentUser.getRole().getName() : null);
+        response.setIsFirstLogin(currentUser.getIsFirstLogin());
+        response.setEmailVerified(currentUser.getEmailVerified());
+        response.setAddresses(currentUser.getAddresses());
         
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/{userId}")
-    @PreAuthorize("hasAuthority('USER_UPDATE') or #userId == authentication.principal.username")
-    public ResponseEntity<Map<String, String>> updateUser(
-            @PathVariable String userId,
-            @RequestBody Map<String, String> request) {
+    @PutMapping("/profile")
+    public ResponseEntity<Map<String, String>> updateProfile(@Valid @RequestBody UpdateUserProfileRequest request) {
+        AppUser currentUser = SecurityUtil.getCurrentUser()
+                .orElseThrow(() -> new RuntimeException("User not authenticated"));
         
-        AppUser appUser = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        // Users cannot change their own role
-        if (request.containsKey("role")) {
-            throw new RuntimeException("Role changes not allowed through this endpoint");
+        if (request.getFullName() != null) {
+            currentUser.setFull_name(request.getFullName());
+        }
+        if (request.getPhoneNumber() != null) {
+            currentUser.setPhone_number(request.getPhoneNumber());
         }
         
-        if (request.containsKey("fullName")) {
-            appUser.setFull_name(request.get("fullName"));
-        }
-        if (request.containsKey("phoneNumber")) {
-            appUser.setPhone_number(request.get("phoneNumber"));
-        }
-        
-        appUser.setAddress(appUser.getAddress()); // Keeping this line as it was in the original code
-        
-        userRepository.save(appUser);
+        userRepository.save(currentUser);
         
         return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));
     }
