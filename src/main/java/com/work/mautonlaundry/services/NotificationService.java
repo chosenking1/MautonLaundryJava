@@ -64,11 +64,40 @@ public class NotificationService {
         dispatchNotification(laundrymanEmail, bookingId, message);
     }
 
-    public void notifyEarlyDeliveryOption(String userEmail, String bookingId, String suggestedDate) {
+    public void notifyLaundryOffer(String laundrymanEmail, String bookingId) {
         String message = String.format(
-                "Booking %s is ready early. Would you like delivery on %s?",
+                "New laundry offer for booking %s. Please accept or reject in app.",
+                bookingId
+        );
+        dispatchNotification(laundrymanEmail, bookingId, message);
+    }
+
+    public void notifyDriverAssigned(String userEmail, String bookingId) {
+        dispatchNotification(userEmail, bookingId, "A driver has been assigned to your booking");
+    }
+
+    public void notifyDriverArriving(String userEmail, String bookingId) {
+        dispatchNotification(userEmail, bookingId, "Your driver is arriving soon");
+    }
+
+    public void notifyLaundryReady(String userEmail, String bookingId) {
+        dispatchNotification(userEmail, bookingId, "Your laundry is ready for delivery");
+    }
+
+    public void notifyOutForDelivery(String userEmail, String bookingId) {
+        dispatchNotification(userEmail, bookingId, "Your laundry is out for delivery");
+    }
+
+    public void notifyDelivered(String userEmail, String bookingId) {
+        dispatchNotification(userEmail, bookingId, "Your laundry has been delivered");
+    }
+
+    public void notifyEarlyDeliveryOption(String userEmail, String bookingId, String scheduledDate, String nextDayDate) {
+        String message = String.format(
+                "Booking %s is ready early. Would you prefer delivery on your scheduled date (%s) or on the next day (%s)?",
                 bookingId,
-                suggestedDate
+                scheduledDate,
+                nextDayDate
         );
         dispatchNotification(userEmail, bookingId, message);
     }
@@ -93,16 +122,16 @@ public class NotificationService {
     private String formatStatusDescription(String status) {
         return switch (status) {
             case "CREATED" -> "Order Placed";
-            case "CONFIRMED" -> "Order Confirmed";
-            case "PENDING_ASSIGNMENT" -> "Finding Laundry Agent";
-            case "PENDING_LAUNDRYMAN_ACCEPTANCE" -> "Awaiting Agent Acceptance";
-            case "LAUNDRYMAN_ACCEPTED" -> "Agent Accepted";
-            case "ENROUTE_FOR_COLLECTION" -> "Agent En Route to Pickup";
-            case "COLLECTED_FROM_CUSTOMER" -> "Items Collected";
-            case "RECEIVED_BY_LAUNDRY" -> "At Laundry";
-            case "READY_FOR_PICKUP" -> "Ready for Pickup";
-            case "ENROUTE_TO_CUSTOMER" -> "Out for Delivery";
+            case "LAUNDRY_ASSIGNMENT_PENDING" -> "Finding Laundry";
+            case "LAUNDRY_ACCEPTED" -> "Laundry Accepted";
+            case "PICKUP_DISPATCH_PENDING" -> "Dispatching Pickup";
+            case "PICKUP_AGENT_ASSIGNED" -> "Pickup Agent Assigned";
+            case "PICKED_UP" -> "Picked Up";
+            case "AT_LAUNDRY" -> "At Laundry";
+            case "WASHING" -> "Washing";
             case "READY_FOR_DELIVERY" -> "Ready for Delivery";
+            case "DELIVERY_DISPATCH_PENDING" -> "Dispatching Delivery";
+            case "DELIVERY_AGENT_ASSIGNED" -> "Delivery Agent Assigned";
             case "OUT_FOR_DELIVERY" -> "Out for Delivery";
             case "DELIVERED" -> "Delivered";
             case "COMPLETED" -> "Completed";

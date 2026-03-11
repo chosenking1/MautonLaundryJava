@@ -21,7 +21,8 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     
     Page<Booking> findByUserAndDeletedFalse(AppUser user, Pageable pageable);
     
-    @Query("SELECT la.booking FROM LaundrymanAssignment la WHERE la.laundryman = :laundryman AND la.booking.deleted = false")
+    @Query("SELECT la.booking FROM LaundrymanAssignment la WHERE la.laundryman = :laundryman " +
+            "AND la.status IN ('ACCEPTED','AUTO_ACCEPTED') AND la.booking.deleted = false")
     Page<Booking> findAssignedBookingsForLaundryman(@Param("laundryman") AppUser laundryman, Pageable pageable);
     
     Page<Booking> findByDeletedFalse(Pageable pageable);
@@ -72,10 +73,13 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.deleted = false AND b.status = 'COMPLETED'")
     Long countCompletedDeliveries();
     
-    @Query("SELECT AVG(TIMESTAMPDIFF(HOUR, b.createdAt, b.updatedAt)) FROM Booking b WHERE b.deleted = false AND b.status = 'COMPLETED'")
+    @Query(value = "SELECT AVG(EXTRACT(EPOCH FROM (b.updated_at - b.created_at)) / 3600) " +
+            "FROM bookings b WHERE b.deleted = false AND b.status = 'COMPLETED'", nativeQuery = true)
     Double avgTurnaroundHours();
-    
-    @Query("SELECT AVG(TIMESTAMPDIFF(HOUR, b.createdAt, b.updatedAt)) FROM Booking b WHERE b.deleted = false AND b.status = 'COMPLETED' AND b.createdAt BETWEEN :start AND :end")
+
+    @Query(value = "SELECT AVG(EXTRACT(EPOCH FROM (b.updated_at - b.created_at)) / 3600) " +
+            "FROM bookings b WHERE b.deleted = false AND b.status = 'COMPLETED' " +
+            "AND b.created_at BETWEEN :start AND :end", nativeQuery = true)
     Double avgTurnaroundHoursBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
     
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.deleted = false AND b.createdAt BETWEEN :start AND :end")

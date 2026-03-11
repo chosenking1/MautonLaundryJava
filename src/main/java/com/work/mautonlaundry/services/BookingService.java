@@ -16,13 +16,13 @@ import com.work.mautonlaundry.security.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,13 +36,26 @@ public class BookingService {
     private final ServicePricingRepository servicePricingRepository;
     private final BookingResourceRepository bookingResourceRepository;
     private final AuditService auditService;
-    private final AssignmentService assignmentService;
+    private final LaundryAssignmentService laundryAssignmentService;
+    private final DispatchEngine dispatchEngine;
     private final NotificationService notificationService;
     private final LaundrymanAssignmentRepository laundrymanAssignmentRepository;
     private final DeliveryAssignmentRepository deliveryAssignmentRepository;
+    private final BookingStateMachine bookingStateMachine;
+    private final StringRedisTemplate redisTemplate;
 
     @Transactional
-    public CreateBookingResponse createBooking(CreateBookingRequest request) {
+    public CreateBookingResponse createBooking(CreateBookingRequest request, String idempotencyKey) {
+        String bookingIdKey = resolveIdempotencyKey(idempotencyKey);
+        if (bookingIdKey != null) {
+            String existingId = redisTemplate.opsForValue().get(bookingIdKey);
+            if (existingId != null && !existingId.isBlank()) {
+                Booking existing = bookingRepository.findById(existingId).orElse(null);
+                if (existing != null) {
+                    return mapCreateBookingResponse(existing);
+                }
+            }
+        }
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
         
         Address pickupAddress = addressRepository.findById(request.getPickupAddressId())
@@ -60,27 +73,23 @@ public class BookingService {
         booking.setTotalPrice(totalPrice);
         booking.setTrackingNumber(generateTrackingNumber());
         booking.setReturnDate(calculateReturnDate(request.getExpress()));
-        booking.setStatus(BookingStatus.PENDING_ASSIGNMENT);
+        booking.setStatus(BookingStatus.CREATED);
         
         // Create and add booking items
         createBookingItems(booking, request.getItems());
         
         // Save everything at once
         Booking savedBooking = bookingRepository.save(booking);
-        assignmentService.assignAgents(savedBooking);
+        laundryAssignmentService.createLaundryOffers(savedBooking);
         savedBooking = bookingRepository.findById(savedBooking.getId()).orElse(savedBooking);
         notificationService.notifyBookingCreated(savedBooking.getUser().getEmail(), savedBooking.getId());
         
         auditService.logAction("CREATE", "BOOKING", savedBooking.getId());
         
-        // Map to response DTO
-        CreateBookingResponse response = new CreateBookingResponse();
-        response.setId(savedBooking.getId());
-        response.setTrackingNumber(savedBooking.getTrackingNumber());
-        response.setTotalPrice(savedBooking.getTotalPrice());
-        response.setReturnDate(savedBooking.getReturnDate());
-        response.setStatus(savedBooking.getStatus().name());
-        
+        CreateBookingResponse response = mapCreateBookingResponse(savedBooking);
+        if (bookingIdKey != null) {
+            redisTemplate.opsForValue().set(bookingIdKey, savedBooking.getId(), Duration.ofHours(24));
+        }
         return response;
     }
 
@@ -99,8 +108,10 @@ public class BookingService {
         
         // Check if laundry agent is assigned to this booking
         if (isLaundryAgent) {
-            var assignment = laundrymanAssignmentRepository.findByBooking(booking);
-            if (assignment.isPresent() && assignment.get().getLaundryman().getId().equals(currentUser.getId())) {
+            var assignments = laundrymanAssignmentRepository.findByBooking(booking);
+            boolean isAssigned = assignments.stream()
+                    .anyMatch(a -> a.getLaundryman().getId().equals(currentUser.getId()));
+            if (isAssigned) {
                 hasAccess = true;
             }
         }
@@ -195,9 +206,13 @@ public class BookingService {
     public Booking updateBookingStatus(String bookingId, BookingStatus newStatus) {
         Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
-        
-        validateStatusTransition(booking.getStatus(), newStatus);
-        
+
+        bookingStateMachine.validateTransition(booking.getStatus(), newStatus);
+
+        if (booking.getStatus() == newStatus) {
+            return booking;
+        }
+
         BookingStatus oldStatus = booking.getStatus();
         booking.setStatus(newStatus);
         booking.setUpdatedAt(LocalDateTime.now());
@@ -210,9 +225,18 @@ public class BookingService {
                 oldStatus.name(),
                 newStatus.name()
         );
+        switch (newStatus) {
+            case DELIVERY_AGENT_ASSIGNED -> notificationService.notifyDriverAssigned(booking.getUser().getEmail(), booking.getId());
+            case OUT_FOR_DELIVERY -> notificationService.notifyOutForDelivery(booking.getUser().getEmail(), booking.getId());
+            case DELIVERED -> notificationService.notifyDelivered(booking.getUser().getEmail(), booking.getId());
+            default -> {
+            }
+        }
 
-        if (newStatus == BookingStatus.READY_FOR_DELIVERY) {
-            assignmentService.notifyNearestDeliveryAgentsForDropOff(bookingId);
+        if (newStatus == BookingStatus.PICKUP_DISPATCH_PENDING) {
+            dispatchEngine.enqueueDispatchJob(booking, com.work.mautonlaundry.data.model.enums.DeliveryAssignmentPhase.PICKUP_FROM_CUSTOMER);
+        } else if (newStatus == BookingStatus.DELIVERY_DISPATCH_PENDING) {
+            dispatchEngine.enqueueDispatchJob(booking, com.work.mautonlaundry.data.model.enums.DeliveryAssignmentPhase.RETURN_TO_CUSTOMER);
         }
         
         auditService.logAction("UPDATE_STATUS", "BOOKING", 
@@ -225,18 +249,8 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
 
-        return booking.getStatus() == BookingStatus.PENDING_ASSIGNMENT
-                || booking.getStatus() == BookingStatus.PENDING_LAUNDRYMAN_ACCEPTANCE
-                || booking.getStatus() == BookingStatus.LAUNDRYMAN_ACCEPTED
-                || booking.getStatus() == BookingStatus.CREATED
-                || booking.getStatus() == BookingStatus.CONFIRMED;
-    }
-
-    private void validateStatusTransition(BookingStatus current, BookingStatus next) {
-        if ((current == BookingStatus.DELIVERED || current == BookingStatus.COMPLETED)
-                && next != current) {
-            throw new RuntimeException("Cannot change status after delivery");
-        }
+        return booking.getStatus() == BookingStatus.CREATED
+                || booking.getStatus() == BookingStatus.LAUNDRY_ASSIGNMENT_PENDING;
     }
 
     private BigDecimal calculateServiceBasedPrice(List<BookingItemRequest> items, boolean express) {
@@ -286,6 +300,23 @@ public class BookingService {
         }
     }
 
+    private CreateBookingResponse mapCreateBookingResponse(Booking booking) {
+        CreateBookingResponse response = new CreateBookingResponse();
+        response.setId(booking.getId());
+        response.setTrackingNumber(booking.getTrackingNumber());
+        response.setTotalPrice(booking.getTotalPrice());
+        response.setReturnDate(booking.getReturnDate());
+        response.setStatus(booking.getStatus().name());
+        return response;
+    }
+
+    private String resolveIdempotencyKey(String rawKey) {
+        if (rawKey == null || rawKey.isBlank()) {
+            return null;
+        }
+        return "idempotency:booking:" + rawKey.trim();
+    }
+
     private String generateTrackingNumber() {
         return "TRK" + System.currentTimeMillis();
     }
@@ -296,65 +327,71 @@ public class BookingService {
     }
 
     @Transactional
-    public boolean acceptDeliveryOffer(String bookingId) {
-        return assignmentService.acceptDeliveryOffer(bookingId);
-    }
-
-    @Transactional
-    public boolean declineDeliveryOffer(String bookingId) {
-        return assignmentService.declineDeliveryOffer(bookingId);
-    }
-
-    @Transactional
-    public void assignLaundryAgentByAdmin(String bookingId, String laundryAgentId) {
-        assignmentService.assignLaundryAgentByAdmin(bookingId, laundryAgentId);
-    }
-
-    @Transactional
     public void markLaundryReceived(String bookingId) {
-        assignmentService.markLaundryReceived(bookingId);
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
+        bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.AT_LAUNDRY);
+        BookingStatus oldStatus = booking.getStatus();
+        booking.setStatus(BookingStatus.AT_LAUNDRY);
+        bookingRepository.save(booking);
+        notificationService.notifyUserBookingStatusChange(
+                booking.getUser().getEmail(),
+                booking.getId(),
+                oldStatus.name(),
+                BookingStatus.AT_LAUNDRY.name()
+        );
     }
 
     @Transactional
     public void markLaundryCompleted(String bookingId) {
-        assignmentService.markLaundryCompleted(bookingId);
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
+
+        if (booking.getStatus() == BookingStatus.AT_LAUNDRY) {
+            bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.WASHING);
+            BookingStatus oldStatus = booking.getStatus();
+            booking.setStatus(BookingStatus.WASHING);
+            bookingRepository.save(booking);
+            notificationService.notifyUserBookingStatusChange(
+                    booking.getUser().getEmail(),
+                    booking.getId(),
+                    oldStatus.name(),
+                    BookingStatus.WASHING.name()
+            );
+        }
+
+        bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.READY_FOR_DELIVERY);
+        BookingStatus oldStatus = booking.getStatus();
+        booking.setStatus(BookingStatus.READY_FOR_DELIVERY);
+        bookingRepository.save(booking);
+        notificationService.notifyUserBookingStatusChange(
+                booking.getUser().getEmail(),
+                booking.getId(),
+                oldStatus.name(),
+                BookingStatus.READY_FOR_DELIVERY.name()
+        );
+        notificationService.notifyLaundryReady(booking.getUser().getEmail(), booking.getId());
+
+        bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.DELIVERY_DISPATCH_PENDING);
+        booking.setStatus(BookingStatus.DELIVERY_DISPATCH_PENDING);
+        bookingRepository.save(booking);
+        dispatchEngine.enqueueDispatchJob(booking, com.work.mautonlaundry.data.model.enums.DeliveryAssignmentPhase.RETURN_TO_CUSTOMER);
+        notificationService.notifyUserBookingStatusChange(
+                booking.getUser().getEmail(),
+                booking.getId(),
+                BookingStatus.READY_FOR_DELIVERY.name(),
+                BookingStatus.DELIVERY_DISPATCH_PENDING.name()
+        );
     }
 
     @Transactional
     public void acceptLaundryAssignment(String bookingId) {
-        assignmentService.acceptLaundryAssignment(bookingId);
+        laundryAssignmentService.acceptLaundryOffer(bookingId);
     }
 
     @Transactional
-    public void respondToEarlyDeliveryOption(String bookingId, boolean acceptTomorrow) {
-        Booking booking = bookingRepository.findByIdAndDeletedFalseForUpdate(bookingId)
-                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
-
-        AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
-        boolean isOwner = booking.getUser().getId().equals(currentUser.getId());
-        boolean isAdmin = currentUser.hasRole("ADMIN");
-        if (!isOwner && !isAdmin) {
-            throw new ForbiddenOperationException("Only booking owner or admin can set early delivery preference");
-        }
-
-        if (booking.getStatus() != BookingStatus.READY_FOR_PICKUP) {
-            throw new IllegalArgumentException("Early delivery preference is only available when booking is READY_FOR_PICKUP");
-        }
-
-        if (booking.getReturnDate() == null) {
-            throw new IllegalArgumentException("Booking has no scheduled return date");
-        }
-
-        booking.setCustomerEarlyDeliveryOptIn(acceptTomorrow);
-        booking.setCustomerEarlyDeliveryDecisionAt(LocalDateTime.now());
-
-        if (acceptTomorrow) {
-            booking.setDeliveryBroadcastAt(LocalDateTime.of(LocalDate.now().plusDays(1), LocalTime.of(8, 0)));
-        } else {
-            LocalDateTime now = LocalDateTime.now();
-            booking.setDeliveryBroadcastAt(booking.getReturnDate().isAfter(now) ? booking.getReturnDate() : now);
-        }
-        bookingRepository.save(booking);
+    public void assignLaundryAgentByAdmin(String bookingId, String laundryAgentId) {
+        laundryAssignmentService.assignLaundryAgentByAdmin(bookingId, laundryAgentId);
     }
 
     @Transactional
@@ -371,16 +408,21 @@ public class BookingService {
             throw new IllegalArgumentException("Booking is already cancelled");
         }
 
-        if (booking.getStatus() == BookingStatus.PICKED_UP ||
-            booking.getStatus() == BookingStatus.ENROUTE_FOR_COLLECTION ||
-            booking.getStatus() == BookingStatus.COLLECTED_FROM_CUSTOMER ||
-            booking.getStatus() == BookingStatus.ENROUTE_TO_CUSTOMER ||
+        if (booking.getStatus() == BookingStatus.PICKUP_DISPATCH_PENDING ||
+            booking.getStatus() == BookingStatus.PICKUP_AGENT_ASSIGNED ||
+            booking.getStatus() == BookingStatus.PICKED_UP ||
+            booking.getStatus() == BookingStatus.AT_LAUNDRY ||
+            booking.getStatus() == BookingStatus.WASHING ||
+            booking.getStatus() == BookingStatus.READY_FOR_DELIVERY ||
+            booking.getStatus() == BookingStatus.DELIVERY_DISPATCH_PENDING ||
+            booking.getStatus() == BookingStatus.DELIVERY_AGENT_ASSIGNED ||
             booking.getStatus() == BookingStatus.OUT_FOR_DELIVERY ||
             booking.getStatus() == BookingStatus.DELIVERED ||
             booking.getStatus() == BookingStatus.COMPLETED) {
             throw new IllegalArgumentException("Cannot cancel booking that has been picked up by delivery agent");
         }
 
+        bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.CANCELLED);
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setUpdatedAt(LocalDateTime.now());
         bookingRepository.save(booking);

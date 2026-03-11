@@ -8,10 +8,17 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 public interface LaundrymanAssignmentRepository extends JpaRepository<LaundrymanAssignment, Long> {
     List<LaundrymanAssignment> findByLaundryman(AppUser laundryman);
     List<LaundrymanAssignment> findByStatus(LaundrymanAssignmentStatus status);
-    Optional<LaundrymanAssignment> findByBooking(Booking booking);
+    List<LaundrymanAssignment> findByBooking(Booking booking);
+    Optional<LaundrymanAssignment> findFirstByBookingAndStatusInOrderByCreatedAtDesc(
+            Booking booking,
+            List<LaundrymanAssignmentStatus> statuses
+    );
+    Optional<LaundrymanAssignment> findByBookingAndLaundryman(Booking booking, AppUser laundryman);
     long countByLaundrymanAndStatusIn(AppUser laundryman, List<LaundrymanAssignmentStatus> statuses);
+    List<LaundrymanAssignment> findByStatusAndCreatedAtBefore(LaundrymanAssignmentStatus status, LocalDateTime before);
 }

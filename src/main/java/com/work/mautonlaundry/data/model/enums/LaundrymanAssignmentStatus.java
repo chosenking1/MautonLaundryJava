@@ -1,7 +1,9 @@
 package com.work.mautonlaundry.data.model.enums;
 
 public enum LaundrymanAssignmentStatus {
-    ASSIGNED,
-    RECEIVED,
-    COMPLETED
+    OFFERED,
+    ACCEPTED,
+    REJECTED,
+    AUTO_ACCEPTED,
+    EXPIRED
 }

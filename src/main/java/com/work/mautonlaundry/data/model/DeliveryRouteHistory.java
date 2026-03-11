@@ -6,25 +6,24 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "location_tracking")
+@Table(name = "delivery_route_history")
 @Getter
 @Setter
 @NoArgsConstructor
-public class LocationTracking {
+public class DeliveryRouteHistory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "booking_id", nullable = true)
+    @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private AppUser user; // Delivery agent or laundryman
+    @JoinColumn(name = "agent_id", nullable = false)
+    private AppUser agent;
 
     @Column(nullable = false, precision = 10, scale = 8)
     private BigDecimal latitude;
@@ -32,6 +31,6 @@ public class LocationTracking {
     @Column(nullable = false, precision = 11, scale = 8)
     private BigDecimal longitude;
 
-    @Column(name = "recorded_at", nullable = false)
-    private LocalDateTime recordedAt = LocalDateTime.now();
+    @Column(name = "timestamp", nullable = false)
+    private Long timestamp;
 }

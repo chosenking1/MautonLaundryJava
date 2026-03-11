@@ -51,7 +51,7 @@ public class AppUser {
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean online = true;
 
-    @Column(nullable = false, columnDefinition = "DOUBLE DEFAULT 5.0")
+    @Column(nullable = false, columnDefinition = "double precision default 5.0")
     private Double rating = 5.0;
 
     @ManyToOne(fetch = FetchType.EAGER)

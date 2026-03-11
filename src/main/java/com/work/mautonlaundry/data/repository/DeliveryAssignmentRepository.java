@@ -22,4 +22,6 @@ public interface DeliveryAssignmentRepository extends JpaRepository<DeliveryAssi
     long countByDeliveryAgentAndStatusIn(AppUser deliveryAgent, List<DeliveryAssignmentStatus> statuses);
     
     Optional<DeliveryAssignment> findTopByBookingAndStatusInOrderByCreatedAtDesc(Booking booking, List<DeliveryAssignmentStatus> statuses);
+
+    boolean existsByBooking_IdAndPhaseAndStatusIn(String bookingId, DeliveryAssignmentPhase phase, List<DeliveryAssignmentStatus> statuses);
 }

@@ -1,8 +1,8 @@
 package com.work.mautonlaundry.services;
 
-import com.work.mautonlaundry.data.model.Booking;
-import com.work.mautonlaundry.data.model.enums.BookingStatus;
-import com.work.mautonlaundry.data.repository.BookingRepository;
+import com.work.mautonlaundry.data.model.LaundrymanAssignment;
+import com.work.mautonlaundry.data.model.enums.LaundrymanAssignmentStatus;
+import com.work.mautonlaundry.data.repository.LaundrymanAssignmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,14 +11,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class BookingLifecycleScheduler {
-    private final BookingRepository bookingRepository;
-    private final AssignmentService assignmentService;
+    private final LaundrymanAssignmentRepository laundrymanAssignmentRepository;
+    private final LaundryAssignmentService laundryAssignmentService;
 
     @Value("${app.assignment.laundry.acceptance-ttl-minutes:60}")
     private long laundryAcceptanceTtlMinutes;
@@ -27,34 +29,19 @@ public class BookingLifecycleScheduler {
     @Transactional
     public void autoAcceptExpiredLaundryAssignments() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(laundryAcceptanceTtlMinutes);
-        List<Booking> expired = bookingRepository.findByStatusAndAssignmentTimestampBeforeAndDeletedFalse(
-                BookingStatus.PENDING_LAUNDRYMAN_ACCEPTANCE,
+        List<LaundrymanAssignment> expiredOffers = laundrymanAssignmentRepository.findByStatusAndCreatedAtBefore(
+                LaundrymanAssignmentStatus.OFFERED,
                 threshold
         );
-
-        for (Booking booking : expired) {
-            booking.setStatus(BookingStatus.LAUNDRYMAN_ACCEPTED);
-            booking.setAutoAccepted(true);
-            bookingRepository.save(booking);
-            assignmentService.notifyNearestDeliveryAgentsForDropOff(booking.getId());
-            log.info("Auto-accepted laundry assignment for booking {}", booking.getId());
-        }
-    }
-
-    @Scheduled(fixedDelayString = "${app.assignment.scheduler.fixed-delay-ms:60000}")
-    @Transactional
-    public void triggerDueDeliveryBroadcasts() {
-        LocalDateTime now = LocalDateTime.now();
-        List<Booking> due = bookingRepository.findByStatusAndDeliveryBroadcastAtBeforeAndDeletedFalse(
-                BookingStatus.READY_FOR_PICKUP,
-                now
-        );
-
-        for (Booking booking : due) {
-            assignmentService.notifyNearestDeliveryAgentsForDropOff(booking.getId());
-            booking.setDeliveryBroadcastAt(null);
-            bookingRepository.save(booking);
-            log.info("Triggered scheduled delivery broadcast for booking {}", booking.getId());
+        Set<String> processedBookings = new HashSet<>();
+        for (LaundrymanAssignment offer : expiredOffers) {
+            String bookingId = offer.getBooking().getId();
+            if (processedBookings.contains(bookingId)) {
+                continue;
+            }
+            processedBookings.add(bookingId);
+            laundryAssignmentService.autoAcceptExpiredOffer(offer);
+            log.info("Auto-accepted laundry offer for booking {}", bookingId);
         }
     }
 }
