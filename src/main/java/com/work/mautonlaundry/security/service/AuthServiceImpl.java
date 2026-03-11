@@ -38,9 +38,12 @@ public class AuthServiceImpl implements AuthService {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // Update first login status
         AppUser user = userRepository.findUserByEmail(loginDto.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        if (!user.getEmailVerified()) {
+            throw new RuntimeException("Email not verified. Please verify your email before logging in.");
+        }
         
         if (user.getIsFirstLogin()) {
             user.setIsFirstLogin(false);

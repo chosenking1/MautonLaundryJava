@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.data.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -39,6 +40,7 @@ public class Permission {
     private String description;
     
     @ManyToMany(mappedBy = "permissions")
+    @JsonIgnore
     private Set<Role> roles;
     
     @Column(nullable = false)

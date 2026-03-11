@@ -1,6 +1,7 @@
 package com.work.mautonlaundry.security.service;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
@@ -66,10 +67,14 @@ public class JwtTokenProvider {
 
     // Validate JWT token
     public boolean validateToken(String token) {
-        Jwts.parser()
-                .verifyWith((SecretKey) key()) // Changed verifyWith to setSigningKey
-                .build()
-                .parseSignedClaims(token); // Use parseClaimsJws instead of parse
-        return true;
+        try {
+            Jwts.parser()
+                    .verifyWith((SecretKey) key())
+                    .build()
+                    .parseSignedClaims(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException ex) {
+            return false;
+        }
     }
 }

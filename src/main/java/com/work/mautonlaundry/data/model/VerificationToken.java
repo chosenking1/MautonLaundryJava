@@ -37,11 +37,11 @@ public class VerificationToken {
         PASSWORD_RESET
     }
     
-    public VerificationToken(String token, AppUser user, TokenType tokenType) {
+    public VerificationToken(String token, AppUser user, TokenType tokenType, int expiryHours) {
         this.token = token;
         this.user = user;
         this.tokenType = tokenType;
-        this.expiryDate = LocalDateTime.now().plusHours(24);
+        this.expiryDate = LocalDateTime.now().plusHours(expiryHours);
     }
     
     public boolean isExpired() {

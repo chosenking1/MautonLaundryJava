@@ -2,6 +2,7 @@ package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.model.Permission;
+import com.work.mautonlaundry.dtos.responses.permission.UserPermissionsResponse;
 import com.work.mautonlaundry.security.util.SecurityUtil;
 import org.springframework.stereotype.Service;
 
@@ -10,15 +11,15 @@ import java.util.*;
 @Service
 public class UserPermissionService {
     
-    public Map<String, Object> getUserPermissions() {
+    public UserPermissionsResponse getUserPermissions() {
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
         
         String roleName = currentUser.getRole() != null ? currentUser.getRole().getName() : "NO_ROLE";
         
-        Map<String, Object> response = new HashMap<>();
-        response.put("role", roleName);
-        response.put("permissions", getUserPermissionsList(currentUser));
-        response.put("pages", getAccessiblePages(currentUser));
+        UserPermissionsResponse response = new UserPermissionsResponse();
+        response.setRole(roleName);
+        response.setPermissions(getUserPermissionsList(currentUser));
+        response.setPages(getAccessiblePages(currentUser));
         
         return response;
     }

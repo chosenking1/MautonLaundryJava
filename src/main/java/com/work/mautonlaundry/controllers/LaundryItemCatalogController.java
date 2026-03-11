@@ -2,6 +2,7 @@ package com.work.mautonlaundry.controllers;
 
 import com.work.mautonlaundry.data.model.LaundryItemCatalog;
 import com.work.mautonlaundry.dtos.requests.laundryitemrequests.LaundryItemRequest;
+import com.work.mautonlaundry.dtos.responses.common.MessageResponse;
 import com.work.mautonlaundry.services.LaundryItemCatalogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +12,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/laundry-items")
@@ -52,8 +52,8 @@ public class LaundryItemCatalogController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('LAUNDRY_ITEM_DELETE')")
-    public ResponseEntity<Map<String, String>> deactivateItem(@PathVariable Long id) {
+    public ResponseEntity<MessageResponse> deactivateItem(@PathVariable Long id) {
         catalogService.deactivateItem(id);
-        return ResponseEntity.ok(Map.of("message", "Item deactivated successfully"));
+        return ResponseEntity.ok(new MessageResponse("Item deactivated successfully"));
     }
 }

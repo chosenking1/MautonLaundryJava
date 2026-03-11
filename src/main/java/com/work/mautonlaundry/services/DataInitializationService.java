@@ -59,10 +59,19 @@ public class DataInitializationService implements CommandLineRunner {
             // Payment Permissions
             {"PAYMENT_CREATE", "Create payments", "PAYMENT", "CREATE", "/api/v1/payments", "POST"},
             {"PAYMENT_READ", "Read payments", "PAYMENT", "READ", "/api/v1/payments/**", "GET"},
+            {"PAYMENT_UPDATE", "Update payments", "PAYMENT", "UPDATE", "/api/v1/payments/**", "PATCH"},
             
             // Delivery Permissions
             {"DELIVERY_READ", "Read deliveries", "DELIVERY", "READ", "/api/v1/deliveries/**", "GET"},
             {"DELIVERY_UPDATE", "Update deliveries", "DELIVERY", "UPDATE", "/api/v1/deliveries/**", "PUT"},
+
+            // Analytics Permissions
+            {"ANALYTICS_READ", "Read analytics", "ANALYTICS", "READ", "/api/v1/admin/analytics/**", "GET"},
+
+            // Role Change Permissions
+            {"ROLE_CHANGE_CREATE", "Create role change requests", "ROLE_CHANGE", "CREATE", "/api/v1/admin/role-requests", "POST"},
+            {"ROLE_CHANGE_UPDATE", "Approve or reject role change requests", "ROLE_CHANGE", "UPDATE", "/api/v1/admin/role-requests/**", "PATCH"},
+            {"ROLE_CHANGE_READ", "Read pending role change requests", "ROLE_CHANGE", "READ", "/api/v1/admin/role-requests/pending", "GET"},
 
             // Access Control Permissions
             {"PERMISSION_CREATE", "Create permissions", "PERMISSION", "CREATE", "/api/v1/permissions", "POST"},
@@ -85,31 +94,34 @@ public class DataInitializationService implements CommandLineRunner {
     }
     
     private void initializeRoles() {
-        // ADMIN role
-        if (!roleRepository.findByName("ADMIN").isPresent()) {
-            Role adminRole = new Role();
-            adminRole.setName("ADMIN");
-            adminRole.setDescription("Administrator with full access");
-            adminRole.setPermissions(new HashSet<>(permissionRepository.findAll()));
-            roleRepository.save(adminRole);
-        }
+        // ADMIN role (always sync to include newly added permissions)
+        Role adminRole = roleRepository.findByName("ADMIN").orElseGet(() -> {
+            Role role = new Role();
+            role.setName("ADMIN");
+            role.setDescription("Administrator with full access");
+            return role;
+        });
+        adminRole.setPermissions(new HashSet<>(permissionRepository.findAll()));
+        roleRepository.save(adminRole);
         
-        // USER role
-        if (!roleRepository.findByName("USER").isPresent()) {
-            Role userRole = new Role();
-            userRole.setName("USER");
-            userRole.setDescription("Regular user");
-            userRole.setPermissions(new HashSet<>(Arrays.asList(
+        // USER role (always sync to include newly added permissions)
+        Role userRole = roleRepository.findByName("USER").orElseGet(() -> {
+            Role role = new Role();
+            role.setName("USER");
+            role.setDescription("Regular user");
+            return role;
+        });
+        userRole.setPermissions(new HashSet<>(Arrays.asList(
                 permissionRepository.findByName("BOOKING_CREATE").orElse(null),
                 permissionRepository.findByName("BOOKING_READ").orElse(null),
+                permissionRepository.findByName("PAYMENT_CREATE").orElse(null),
                 permissionRepository.findByName("PAYMENT_READ").orElse(null),
                 permissionRepository.findByName("ADDRESS_CREATE").orElse(null),
                 permissionRepository.findByName("ADDRESS_READ").orElse(null),
                 permissionRepository.findByName("ADDRESS_UPDATE").orElse(null),
                 permissionRepository.findByName("ADDRESS_DELETE").orElse(null)
-            )));
-            roleRepository.save(userRole);
-        }
+        )));
+        roleRepository.save(userRole);
         
         // LAUNDRY_AGENT role
         if (!roleRepository.findByName("LAUNDRY_AGENT").isPresent()) {

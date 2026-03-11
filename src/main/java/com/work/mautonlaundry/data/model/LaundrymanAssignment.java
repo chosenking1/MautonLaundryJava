@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.data.model;
 
+import com.work.mautonlaundry.data.model.enums.LaundrymanAssignmentStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,12 +28,9 @@ public class LaundrymanAssignment {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private AssignmentStatus status = AssignmentStatus.ASSIGNED;
+    private LaundrymanAssignmentStatus status = LaundrymanAssignmentStatus.ASSIGNED;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public enum AssignmentStatus {
-        ASSIGNED, RECEIVED, COMPLETED
-    }
 }

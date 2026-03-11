@@ -30,6 +30,8 @@ public class DynamicPermissionFilter extends OncePerRequestFilter {
             request.getRequestURI().startsWith("/api/auth/") || 
             request.getRequestURI().equals("/register") ||
             request.getRequestURI().startsWith("/api/v1/services") ||
+            request.getRequestURI().startsWith("/api/v1/payments/webhooks") ||
+            request.getRequestURI().startsWith("/api/v1/payments/callback") ||
             request.getRequestURI().startsWith("/api/v1/pricing") ||
             request.getRequestURI().startsWith("/api/v1/addresses") ||
             request.getRequestURI().startsWith("/api/v1/users") ||

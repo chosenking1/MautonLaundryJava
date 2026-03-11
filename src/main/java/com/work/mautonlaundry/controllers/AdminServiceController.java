@@ -26,11 +26,11 @@ import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/admin/services")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminServiceController {
     
     private final LaundryService laundryService;
@@ -41,14 +41,12 @@ public class AdminServiceController {
     private String uploadDir;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ServiceResponse> createService(@Valid @RequestBody CreateServiceRequest request) {
         ServiceResponse response = laundryService.createService(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ServiceResponse> updateService(
             @PathVariable Long id,
             @RequestBody UpdateServiceRequest request) {
@@ -57,28 +55,24 @@ public class AdminServiceController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<ServiceResponse>> getAllServices() {
         List<ServiceResponse> services = laundryService.getAllServices();
         return ResponseEntity.ok(services);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ServiceResponse> getServiceById(@PathVariable Long id) {
         ServiceResponse service = laundryService.getServiceById(id);
         return ResponseEntity.ok(service);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteService(@PathVariable Long id) {
         laundryService.deleteService(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{serviceId}/pricing")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ServicePricing> createServicePricing(
             @PathVariable Long serviceId,
             @Valid @RequestBody CreateServicePricingRequest request) {
@@ -97,14 +91,12 @@ public class AdminServiceController {
     }
 
     @GetMapping("/{serviceId}/pricing")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<ServicePricing>> getServicePricing(@PathVariable Long serviceId) {
         List<ServicePricing> pricing = servicePricingRepository.findByServiceIdAndActiveTrue(serviceId);
         return ResponseEntity.ok(pricing);
     }
 
     @PutMapping("/{serviceId}/pricing/{pricingId}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ServicePricing> updateServicePricing(
             @PathVariable Long serviceId,
             @PathVariable Long pricingId,
@@ -130,7 +122,6 @@ public class AdminServiceController {
     }
 
     @DeleteMapping("/{serviceId}/pricing/{pricingId}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteServicePricing(
             @PathVariable Long serviceId,
             @PathVariable Long pricingId) {
@@ -168,19 +159,4 @@ public class AdminServiceController {
         }
     }
     
-    @GetMapping("/debug/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> debugService(@PathVariable Long id) {
-        Services service = serviceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Service not found"));
-        
-        Map<String, Object> debug = Map.of(
-            "id", service.getId(),
-            "name", service.getName(),
-            "imagePath", service.getImagePath() != null ? service.getImagePath() : "NULL",
-            "uploadDir", uploadDir
-        );
-        
-        return ResponseEntity.ok(debug);
-    }
 }

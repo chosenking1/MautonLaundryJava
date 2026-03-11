@@ -83,6 +83,18 @@ public class AuthController {
         return ResponseEntity.ok("Verification email sent");
     }
 
+    @GetMapping("/verify-email")
+    public ResponseEntity<String> verifyEmailGet(@RequestParam String token) {
+        log.info("Email verification attempt with token via GET");
+        boolean verified = userService.verifyEmail(token);
+        if (verified) {
+            log.info("Email verification successful");
+            return ResponseEntity.ok("Email verified successfully. You can now log in.");
+        }
+        log.warn("Email verification failed - invalid or expired token");
+        return ResponseEntity.badRequest().body("Invalid or expired token");
+    }
+
     @PostMapping("/verify-email")
     public ResponseEntity<String> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
         log.info("Email verification attempt with token");
@@ -93,6 +105,12 @@ public class AuthController {
         }
         log.warn("Email verification failed - invalid or expired token");
         return ResponseEntity.badRequest().body("Invalid or expired token");
+    }
+
+    @GetMapping("/reset-password")
+    public ResponseEntity<String> resetPasswordGet(@RequestParam String token) {
+        log.info("Password reset page accessed with token via GET");
+        return ResponseEntity.ok("Token valid. Use POST /api/auth/reset-password with the token to set new password.");
     }
 
     @PostMapping("/forgot-password")

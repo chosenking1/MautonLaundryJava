@@ -7,15 +7,23 @@ import com.work.mautonlaundry.data.model.enums.RequestStatus;
 import com.work.mautonlaundry.data.repository.RoleChangeRequestRepository;
 import com.work.mautonlaundry.data.repository.RoleRepository;
 import com.work.mautonlaundry.data.repository.UserRepository;
+import com.work.mautonlaundry.exceptions.ConflictException;
+import com.work.mautonlaundry.exceptions.ForbiddenOperationException;
+import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import com.work.mautonlaundry.security.util.SecurityUtil;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class RoleChangeService {
     
@@ -29,14 +37,14 @@ public class RoleChangeService {
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
         
         if (currentUser.getId().equals(userId)) {
-            throw new RuntimeException("Admins cannot request role changes for themselves");
+            throw new ForbiddenOperationException("Admins cannot request role changes for themselves");
         }
         
         AppUser targetUser = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
         
         Role requestedRole = roleRepository.findByName(roleName)
-                .orElseThrow(() -> new RuntimeException("Role not found"));
+                .orElseThrow(() -> new NoSuchElementException("Role not found"));
         
         RoleChangeRequest request = new RoleChangeRequest();
         request.setUser(targetUser);
@@ -55,14 +63,14 @@ public class RoleChangeService {
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
         
         RoleChangeRequest request = requestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new NoSuchElementException("Request not found"));
         
         if (request.getRequestedByAdminId().equals(currentUser.getId())) {
-            throw new RuntimeException("Maker cannot approve their own request");
+            throw new ForbiddenOperationException("Maker cannot approve their own request");
         }
         
         if (request.getStatus() != RequestStatus.PENDING) {
-            throw new RuntimeException("Request is not pending");
+            throw new ConflictException("Request is not pending");
         }
         
         request.setStatus(RequestStatus.APPROVED);
@@ -85,14 +93,14 @@ public class RoleChangeService {
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
         
         RoleChangeRequest request = requestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new NoSuchElementException("Request not found"));
         
         if (request.getRequestedByAdminId().equals(currentUser.getId())) {
-            throw new RuntimeException("Maker cannot reject their own request");
+            throw new ForbiddenOperationException("Maker cannot reject their own request");
         }
         
         if (request.getStatus() != RequestStatus.PENDING) {
-            throw new RuntimeException("Request is not pending");
+            throw new ConflictException("Request is not pending");
         }
         
         request.setStatus(RequestStatus.REJECTED);
@@ -106,6 +114,19 @@ public class RoleChangeService {
     }
 
     public List<RoleChangeRequest> getPendingRequests() {
-        return requestRepository.findByStatus(RequestStatus.PENDING);
+        List<RoleChangeRequest> all = requestRepository.findAll();
+        List<RoleChangeRequest> pendingRaw = requestRepository.findDistinctByStatus(RequestStatus.PENDING);
+        Map<Long, RoleChangeRequest> deduplicated = new LinkedHashMap<>();
+        for (RoleChangeRequest request : pendingRaw) {
+            deduplicated.put(request.getId(), request);
+        }
+        List<RoleChangeRequest> pending = List.copyOf(deduplicated.values());
+        long approvedCount = all.stream().filter(req -> req.getStatus() == RequestStatus.APPROVED).count();
+        long rejectedCount = all.stream().filter(req -> req.getStatus() == RequestStatus.REJECTED).count();
+
+        log.info("Role requests summary -> total: {}, pendingRaw: {}, pendingDistinct: {}, approved: {}, rejected: {}",
+                all.size(), pendingRaw.size(), pending.size(), approvedCount, rejectedCount);
+
+        return pending;
     }
 }

@@ -10,4 +10,5 @@ import java.util.List;
 @Repository
 public interface RoleChangeRequestRepository extends JpaRepository<RoleChangeRequest, Long> {
     List<RoleChangeRequest> findByStatus(RequestStatus status);
+    List<RoleChangeRequest> findDistinctByStatus(RequestStatus status);
 }

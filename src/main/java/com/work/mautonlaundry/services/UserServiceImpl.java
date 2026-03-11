@@ -21,6 +21,7 @@ import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import com.work.mautonlaundry.security.service.AuthService;
 import com.work.mautonlaundry.security.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.CacheManager;
@@ -62,6 +63,12 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private final PasswordEncoder passwordEncoder;
 
     private final ModelMapper mapper;
+
+    @Value("${app.token.verification.expiry-hours:24}")
+    private int verificationTokenExpiryHours;
+
+    @Value("${app.token.password-reset.expiry-hours:1}")
+    private int passwordResetTokenExpiryHours;
 
     @Autowired
     private AuditService auditService;
@@ -290,14 +297,18 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     public void sendEmailVerification(String email) {
+        log.info("Starting email verification process for: {}", email);
+        
         AppUser user = userRepository.findUserByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
         
         String token = tokenGenerator.generateSecureToken();
-        VerificationToken verificationToken = new VerificationToken(token, user, VerificationToken.TokenType.EMAIL_VERIFICATION);
+        VerificationToken verificationToken = new VerificationToken(token, user, VerificationToken.TokenType.EMAIL_VERIFICATION, verificationTokenExpiryHours);
         tokenRepository.save(verificationToken);
         
+        log.info("Sending verification email to: {} with token: {}", email, token);
         emailService.sendVerificationEmail(email, token);
+        log.info("Verification email sent successfully to: {}", email);
     }
 
     @Override
@@ -329,7 +340,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
         
         String token = tokenGenerator.generateSecureToken();
-        VerificationToken resetToken = new VerificationToken(token, user, VerificationToken.TokenType.PASSWORD_RESET);
+        VerificationToken resetToken = new VerificationToken(token, user, VerificationToken.TokenType.PASSWORD_RESET, passwordResetTokenExpiryHours);
         tokenRepository.save(resetToken);
         
         emailService.sendPasswordResetEmail(email, token);

@@ -19,7 +19,7 @@ public class LocationTracking {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "booking_id", nullable = false)
+    @JoinColumn(name = "booking_id", nullable = true)
     private Booking booking;
 
     @ManyToOne

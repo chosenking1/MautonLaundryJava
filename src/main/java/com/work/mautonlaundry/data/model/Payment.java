@@ -2,6 +2,7 @@ package com.work.mautonlaundry.data.model;
 
 
 import com.work.mautonlaundry.data.model.enums.PaymentMethod;
+import com.work.mautonlaundry.data.model.enums.PaymentProvider;
 import com.work.mautonlaundry.data.model.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -34,11 +35,24 @@ public class Payment {
     private PaymentMethod paymentMethod; // Enum for CARD, CASH, TRANSFER, etc.
 
     @Enumerated(EnumType.STRING)
+    @Column
+    private PaymentProvider provider;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentStatus status; // Enum for PENDING, SUCCESS, FAILED, REFUNDED
 
     @Column(unique = true) // Transaction ID from payment gateway, should be unique
     private String transactionId; // Reference to the payment gateway's transaction ID
+
+    @Column
+    private String checkoutUrl;
+
+    @Column
+    private String lastWebhookEventId;
+
+    @Column(columnDefinition = "TEXT")
+    private String gatewayPayload;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -49,4 +63,3 @@ public class Payment {
     // @JoinColumn(name = "user_id")
     // private User user;
 }
-

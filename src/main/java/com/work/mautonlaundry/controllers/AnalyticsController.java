@@ -1,39 +1,51 @@
 package com.work.mautonlaundry.controllers;
 
-import com.work.mautonlaundry.security.util.RequiresPermission;
+import com.work.mautonlaundry.dtos.responses.analytics.DashboardAnalyticsResponse;
+import com.work.mautonlaundry.dtos.responses.analytics.MonthlyStatsResponse;
+import com.work.mautonlaundry.dtos.responses.analytics.TimeSeriesResponse;
+import com.work.mautonlaundry.dtos.responses.analytics.UsersByRoleResponse;
 import com.work.mautonlaundry.services.AnalyticsService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
+import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/api/v1/analytics")
+@RequestMapping("/api/v1/admin/analytics")
 @PreAuthorize("hasAuthority('ANALYTICS_READ')")
+@RequiredArgsConstructor
 public class AnalyticsController {
     
-    @Autowired
-    private AnalyticsService analyticsService;
+    private final AnalyticsService analyticsService;
     
     @GetMapping("/dashboard")
-    public ResponseEntity<Map<String, Object>> getDashboardAnalytics() {
-        Map<String, Object> analytics = analyticsService.getDashboardAnalytics();
-        return ResponseEntity.ok(analytics);
+    public ResponseEntity<DashboardAnalyticsResponse> getDashboardAnalytics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(analyticsService.getDashboardAnalytics(from, to));
     }
     
     @GetMapping("/users-by-role")
-    public ResponseEntity<Map<String, Long>> getUsersByRole() {
-        Map<String, Long> usersByRole = analyticsService.getUsersByRole();
-        return ResponseEntity.ok(usersByRole);
+    public ResponseEntity<UsersByRoleResponse> getUsersByRole() {
+        return ResponseEntity.ok(analyticsService.getUsersByRole());
     }
     
     @GetMapping("/monthly-stats")
-    public ResponseEntity<Map<String, Object>> getMonthlyStats() {
-        Map<String, Object> monthlyStats = analyticsService.getMonthlyStats();
-        return ResponseEntity.ok(monthlyStats);
+    public ResponseEntity<MonthlyStatsResponse> getMonthlyStats(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+        return ResponseEntity.ok(analyticsService.getMonthlyStats(year, month));
+    }
+    
+    @GetMapping("/timeseries")
+    public ResponseEntity<TimeSeriesResponse> getTimeSeries(
+            @RequestParam String metric,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "DAY") String groupBy) {
+        return ResponseEntity.ok(analyticsService.getTimeSeries(metric, from, to, groupBy));
     }
 }

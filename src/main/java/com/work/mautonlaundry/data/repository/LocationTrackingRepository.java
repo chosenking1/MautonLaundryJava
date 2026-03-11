@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,4 +19,7 @@ public interface LocationTrackingRepository extends JpaRepository<LocationTracki
     List<LocationTracking> findByBookingOrderByRecordedAtDesc(Booking booking);
     
     List<LocationTracking> findByUserOrderByRecordedAtDesc(AppUser user);
+    
+    @Query("SELECT l FROM LocationTracking l WHERE l.user = :user AND l.recordedAt > :since ORDER BY l.recordedAt DESC LIMIT 1")
+    Optional<LocationTracking> findLatestByUserSince(@Param("user") AppUser user, @Param("since") LocalDateTime since);
 }

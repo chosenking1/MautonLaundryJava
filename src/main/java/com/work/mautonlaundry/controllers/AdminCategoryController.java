@@ -16,19 +16,18 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/categories")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminCategoryController {
     
     private final CategoryRepository categoryRepository;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Category>> getAllCategories() {
         List<Category> categories = categoryRepository.findAll();
         return ResponseEntity.ok(categories);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Category> getCategory(@PathVariable Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
@@ -36,7 +35,6 @@ public class AdminCategoryController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Category> createCategory(@RequestBody CreateCategoryRequest request) {
         if (categoryRepository.existsByName(request.getName())) {
             throw new RuntimeException("Category already exists");
@@ -52,7 +50,6 @@ public class AdminCategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Category> updateCategory(@PathVariable Long id, @RequestBody UpdateCategoryRequest request) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
@@ -72,12 +69,21 @@ public class AdminCategoryController {
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> activateCategory(@PathVariable Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
         
         category.setActive(true);
+        categoryRepository.save(category);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Category not found"));
+
+        category.setActive(false);
         categoryRepository.save(category);
         return ResponseEntity.noContent().build();
     }

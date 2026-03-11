@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 
@@ -46,12 +48,24 @@ public class AppUser {
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean isFirstLogin = true;
 
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean online = true;
+
+    @Column(nullable = false, columnDefinition = "DOUBLE DEFAULT 5.0")
+    private Double rating = 5.0;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<Address> addresses;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "modified_at")
+    private LocalDateTime modifiedAt;
 
     // Helper method to check for a role
     public boolean hasRole(String roleName) {
@@ -70,8 +84,10 @@ public class AppUser {
     public Address getMostRecentlyUsedAddress() {
         if (addresses == null || addresses.isEmpty()) return null;
         return addresses.stream()
-                .filter(address -> !address.getDeleted())
-                .max((a1, a2) -> a1.getLastUsed().compareTo(a2.getLastUsed()))
+                .filter(address -> !Boolean.TRUE.equals(address.getDeleted()))
+                .max(Comparator.comparing(
+                        address -> address.getLastUsed() == null ? LocalDateTime.MIN : address.getLastUsed()
+                ))
                 .orElse(null);
     }
 }

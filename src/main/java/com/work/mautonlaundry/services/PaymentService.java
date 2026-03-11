@@ -1,13 +1,19 @@
 package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.dtos.requests.paymentrequests.CreatePaymentRequest;
-import jakarta.validation.Valid;
+import com.work.mautonlaundry.dtos.requests.paymentrequests.PaymentUpdateRequest;
+import com.work.mautonlaundry.dtos.responses.paymentresponses.CreatePaymentResponse;
+
+import java.util.List;
 
 public interface PaymentService {
-    void processPayment();
+    CreatePaymentResponse createPayment(CreatePaymentRequest request);
 
-    void createPayment(CreatePaymentRequest request);
+    CreatePaymentResponse getPaymentById(Long paymentId);
 
-    void updatePayment();
-    void deletePayment();
+    CreatePaymentResponse getPaymentByBookingId(String bookingId);
+
+    List<CreatePaymentResponse> getMyPayments();
+
+    CreatePaymentResponse updatePaymentStatus(Long paymentId, PaymentUpdateRequest request);
 }

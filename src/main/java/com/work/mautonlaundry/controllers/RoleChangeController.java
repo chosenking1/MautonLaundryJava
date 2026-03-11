@@ -14,7 +14,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin/role-requests")
-@PreAuthorize("hasAuthority('ROLE_CHANGE_READ')") // Assuming read access to the endpoint implies general access
 @RequiredArgsConstructor
 public class RoleChangeController {
     

@@ -3,13 +3,13 @@ package com.work.mautonlaundry.services;
 import com.work.mautonlaundry.data.model.*;
 import com.work.mautonlaundry.data.repository.*;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.BookingItemRequest;
+import com.work.mautonlaundry.dtos.responses.pricing.PricingConfigResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -72,11 +72,11 @@ public class PricingEngine {
                 .orElse(BigDecimal.valueOf(50.00));
     }
 
-    public Map<String, BigDecimal> getPricingConfig() {
-        return Map.of(
-            "expressFee", getExpressFee(),
-            "deliveryFee", getDeliveryFee(),
-            "freeDeliveryThreshold", getFreeDeliveryThreshold()
-        );
+    public PricingConfigResponse getPricingConfig() {
+        PricingConfigResponse response = new PricingConfigResponse();
+        response.setExpressFee(getExpressFee());
+        response.setDeliveryFee(getDeliveryFee());
+        response.setFreeDeliveryThreshold(getFreeDeliveryThreshold());
+        return response;
     }
 }

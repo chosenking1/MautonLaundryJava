@@ -3,14 +3,13 @@ package com.work.mautonlaundry.controllers;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserProfileRequest;
+import com.work.mautonlaundry.dtos.responses.common.MessageResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.CurrentUserResponse;
 import com.work.mautonlaundry.security.util.SecurityUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -38,7 +37,7 @@ public class UserController {
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<Map<String, String>> updateProfile(@Valid @RequestBody UpdateUserProfileRequest request) {
+    public ResponseEntity<MessageResponse> updateProfile(@Valid @RequestBody UpdateUserProfileRequest request) {
         AppUser currentUser = SecurityUtil.getCurrentUser()
                 .orElseThrow(() -> new RuntimeException("User not authenticated"));
         
@@ -51,6 +50,6 @@ public class UserController {
         
         userRepository.save(currentUser);
         
-        return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));
+        return ResponseEntity.ok(new MessageResponse("Profile updated successfully"));
     }
 }

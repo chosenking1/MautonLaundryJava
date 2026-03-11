@@ -1,7 +1,11 @@
 package com.work.mautonlaundry.data.model;
 
+import com.work.mautonlaundry.data.model.enums.BookingStatus;
+import com.work.mautonlaundry.data.model.enums.BookingType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,6 +32,7 @@ public class Booking {
     private BookingType bookingType;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false)
     private BookingStatus status = BookingStatus.CREATED;
 
@@ -56,6 +61,25 @@ public class Booking {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Version
+    @Column(nullable = false)
+    private Long version = 0L;
+
+    @Column(name = "assignment_timestamp")
+    private LocalDateTime assignmentTimestamp;
+
+    @Column(name = "auto_accepted", nullable = false)
+    private Boolean autoAccepted = false;
+
+    @Column(name = "delivery_broadcast_at")
+    private LocalDateTime deliveryBroadcastAt;
+
+    @Column(name = "customer_early_delivery_opt_in")
+    private Boolean customerEarlyDeliveryOptIn;
+
+    @Column(name = "customer_early_delivery_decision_at")
+    private LocalDateTime customerEarlyDeliveryDecisionAt;
+
     @Column(nullable = false)
     private Boolean deleted = false;
 
@@ -65,13 +89,4 @@ public class Booking {
     @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL)
     private Payment payment;
 
-    public enum BookingType {
-        LAUNDRY, CLEANING, SERVICE // Added generic SERVICE type
-    }
-
-    public enum BookingStatus {
-        CREATED, CONFIRMED, PICKUP_ASSIGNED, PICKED_UP, 
-        RECEIVED_BY_LAUNDRYMAN, WASHING, READY_FOR_DELIVERY, 
-        OUT_FOR_DELIVERY, DELIVERED, CANCELLED
-    }
 }

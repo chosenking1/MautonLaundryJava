@@ -18,6 +18,9 @@ public class BookingDetailsResponse {
     private Boolean express;
     private LocalDateTime returnDate;
     private LocalDateTime createdAt;
+    private String laundryAgentId;
+    private String pickupAgentId;
+    private String returnAgentId;
     
     private AddressInfo pickupAddress;
     private List<BookingItemInfo> items;
