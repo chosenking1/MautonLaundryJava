@@ -59,6 +59,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private final TokenGenerator tokenGenerator;
     private final CacheManager cacheManager;
     private final AuthService authService;
+    private final NotificationService notificationService;
 
     private final PasswordEncoder passwordEncoder;
 
@@ -70,13 +71,17 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Value("${app.token.password-reset.expiry-hours:1}")
     private int passwordResetTokenExpiryHours;
 
+    @Value("${app.admin.team-email:}")
+    private String adminTeamEmail;
+
     @Autowired
     private AuditService auditService;
 
     @Autowired
     public UserServiceImpl(UserRepository userRepository, AddressRepository addressRepository, RoleRepository roleRepository, VerificationTokenRepository tokenRepository,
                            EmailService emailService, TokenGenerator tokenGenerator, CacheManager cacheManager,
-                           @Lazy AuthService authService, PasswordEncoder passwordEncoder, ModelMapper mapper) {
+                           @Lazy AuthService authService, PasswordEncoder passwordEncoder, ModelMapper mapper,
+                           NotificationService notificationService) {
         this.userRepository = userRepository;
         this.addressRepository = addressRepository;
         this.roleRepository = roleRepository;
@@ -87,6 +92,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         this.authService = authService;
         this.passwordEncoder = passwordEncoder;
         this.mapper = mapper;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -372,6 +378,27 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         tokenRepository.save(resetToken);
         
         return true;
+    }
+
+    @Override
+    @Transactional
+    public void deactivateAgent(String userId, String reason) {
+        AppUser user = userRepository.findUserById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        if (user.getRole() == null || (!"LAUNDRY_AGENT".equals(user.getRole().getName())
+                && !"DELIVERY_AGENT".equals(user.getRole().getName()))) {
+            throw new AccessDeniedException("User is not an active agent");
+        }
+
+        String previousRole = user.getRole().getName();
+        Role customerRole = roleRepository.findByName("USER")
+                .orElseThrow(() -> new RuntimeException("Default role 'USER' not found in database"));
+        user.setRole(customerRole);
+        userRepository.save(user);
+
+        notificationService.notifyAgentDeactivated(user.getEmail(), previousRole, adminTeamEmail, reason);
+        auditService.logAction("DEACTIVATE_AGENT", "USER", user.getId());
     }
 
     @Override

@@ -92,6 +92,14 @@ public class NotificationService {
         dispatchNotification(userEmail, bookingId, "Your laundry has been delivered");
     }
 
+    public void notifyDeliveryProgress(String userEmail, String bookingId, String message) {
+        dispatchNotification(userEmail, bookingId, message);
+    }
+
+    public void notifyLaundryProgress(String laundryEmail, String bookingId, String message) {
+        dispatchNotification(laundryEmail, bookingId, message);
+    }
+
     public void notifyEarlyDeliveryOption(String userEmail, String bookingId, String scheduledDate, String nextDayDate) {
         String message = String.format(
                 "Booking %s is ready early. Would you prefer delivery on your scheduled date (%s) or on the next day (%s)?",
@@ -100,6 +108,56 @@ public class NotificationService {
                 nextDayDate
         );
         dispatchNotification(userEmail, bookingId, message);
+    }
+
+    public void notifyAgentApplicationSubmitted(String userEmail, String roleName, int locationsCount, String adminTeamEmail) {
+        notificationExecutor.submit(() -> {
+            try {
+                emailService.sendAgentApplicationSubmitted(userEmail, roleName, locationsCount, adminTeamEmail);
+            } catch (Exception ex) {
+                log.error("Failed to send application submitted email to {}. Error: {}", userEmail, ex.getMessage(), ex);
+            }
+        });
+    }
+
+    public void notifyAdminNewAgentApplication(String adminEmail, String applicantEmail, String roleName, int locationsCount) {
+        notificationExecutor.submit(() -> {
+            try {
+                emailService.sendAdminAgentApplicationNotification(adminEmail, applicantEmail, roleName, locationsCount);
+            } catch (Exception ex) {
+                log.error("Failed to send admin application notification. Error: {}", ex.getMessage(), ex);
+            }
+        });
+    }
+
+    public void notifyAgentApplicationApproved(String userEmail, String roleName) {
+        notificationExecutor.submit(() -> {
+            try {
+                emailService.sendAgentApplicationApproved(userEmail, roleName);
+            } catch (Exception ex) {
+                log.error("Failed to send application approved email to {}. Error: {}", userEmail, ex.getMessage(), ex);
+            }
+        });
+    }
+
+    public void notifyAgentApplicationRejected(String userEmail, String roleName, String reason, String adminTeamEmail) {
+        notificationExecutor.submit(() -> {
+            try {
+                emailService.sendAgentApplicationRejected(userEmail, roleName, reason, adminTeamEmail);
+            } catch (Exception ex) {
+                log.error("Failed to send application rejected email to {}. Error: {}", userEmail, ex.getMessage(), ex);
+            }
+        });
+    }
+
+    public void notifyAgentDeactivated(String userEmail, String roleName, String adminTeamEmail, String reason) {
+        notificationExecutor.submit(() -> {
+            try {
+                emailService.sendAgentDeactivated(userEmail, roleName, adminTeamEmail, reason);
+            } catch (Exception ex) {
+                log.error("Failed to send deactivation email to {}. Error: {}", userEmail, ex.getMessage(), ex);
+            }
+        });
     }
 
     private void dispatchNotification(String email, String bookingId, String message) {

@@ -52,6 +52,45 @@ public class EmailServiceImpl implements EmailService {
         sendEmail(email, subject, body);
     }
 
+    @Override
+    public void sendAgentApplicationSubmitted(String email, String roleName, int locationsCount, String adminTeamEmail) {
+        String subject = "Agent Application Received - " + fromName;
+        String body = buildAgentApplicationSubmittedBody(roleName, locationsCount, adminTeamEmail);
+        sendEmail(email, subject, body);
+    }
+
+    @Override
+    public void sendAdminAgentApplicationNotification(String adminEmail, String applicantEmail, String roleName, int locationsCount) {
+        if (adminEmail == null || adminEmail.isBlank()) {
+            log.warn("Admin team email not configured. Skipping admin notification.");
+            return;
+        }
+        String subject = "New Agent Application - " + fromName;
+        String body = buildAdminAgentApplicationNotificationBody(applicantEmail, roleName, locationsCount);
+        sendEmail(adminEmail, subject, body);
+    }
+
+    @Override
+    public void sendAgentApplicationApproved(String email, String roleName) {
+        String subject = "Application Approved - " + fromName;
+        String body = buildAgentApplicationApprovedBody(roleName);
+        sendEmail(email, subject, body);
+    }
+
+    @Override
+    public void sendAgentApplicationRejected(String email, String roleName, String reason, String adminTeamEmail) {
+        String subject = "Application Update - " + fromName;
+        String body = buildAgentApplicationRejectedBody(roleName, reason, adminTeamEmail);
+        sendEmail(email, subject, body);
+    }
+
+    @Override
+    public void sendAgentDeactivated(String email, String roleName, String adminTeamEmail, String reason) {
+        String subject = "Account Update - " + fromName;
+        String body = buildAgentDeactivationBody(roleName, reason, adminTeamEmail);
+        sendEmail(email, subject, body);
+    }
+
     private void sendEmail(String to, String subject, String body) {
         try {
             log.info("Attempting to send email to: {} with subject: {}", to, subject);
@@ -118,6 +157,77 @@ public class EmailServiceImpl implements EmailService {
                 "<p><strong>Status:</strong> " + status + "</p>" +
                 "<p>You can track your order in your account dashboard.</p>" +
                 "<p>Thank you for choosing " + fromName + "!</p>" +
+                "<p>Best regards,<br>The " + fromName + " Team</p>" +
+                "</body>" +
+                "</html>";
+    }
+
+    private String buildAgentApplicationSubmittedBody(String roleName, int locationsCount, String adminTeamEmail) {
+        boolean isLaundry = "LAUNDRY_AGENT".equalsIgnoreCase(roleName);
+        return "<html>" +
+                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
+                "<h2>Application Received</h2>" +
+                "<p>Thank you for applying to become a " + roleName.replace("_", " ").toLowerCase() + ".</p>" +
+                "<p>We have recorded " + locationsCount + " location(s).</p>" +
+                (isLaundry
+                        ? "<p>Our team will conduct verification visits to the locations provided. Visits can happen on any day without prior notice.</p>" +
+                          "<p>If any location fails inspection, the application will be declined.</p>"
+                        : "<p>Our team will review your details and get back to you.</p>") +
+                (adminTeamEmail == null || adminTeamEmail.isBlank()
+                        ? ""
+                        : "<p>If you need to update your information, contact us at " + adminTeamEmail + ".</p>") +
+                "<p>Best regards,<br>The " + fromName + " Team</p>" +
+                "</body>" +
+                "</html>";
+    }
+
+    private String buildAdminAgentApplicationNotificationBody(String applicantEmail, String roleName, int locationsCount) {
+        return "<html>" +
+                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
+                "<h2>New Agent Application</h2>" +
+                "<p>A new application has been submitted.</p>" +
+                "<p><strong>Applicant:</strong> " + applicantEmail + "</p>" +
+                "<p><strong>Role:</strong> " + roleName.replace("_", " ").toLowerCase() + "</p>" +
+                "<p><strong>Locations:</strong> " + locationsCount + "</p>" +
+                "<p>Please log in to the admin dashboard to review.</p>" +
+                "</body>" +
+                "</html>";
+    }
+
+    private String buildAgentApplicationApprovedBody(String roleName) {
+        return "<html>" +
+                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
+                "<h2>Application Approved</h2>" +
+                "<p>Your application to become a " + roleName.replace("_", " ").toLowerCase() + " has been approved.</p>" +
+                "<p>You can now log in to the Imototo Ops application to access agent functionality.</p>" +
+                "<p>Best regards,<br>The " + fromName + " Team</p>" +
+                "</body>" +
+                "</html>";
+    }
+
+    private String buildAgentApplicationRejectedBody(String roleName, String reason, String adminTeamEmail) {
+        return "<html>" +
+                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
+                "<h2>Application Update</h2>" +
+                "<p>Your application to become a " + roleName.replace("_", " ").toLowerCase() + " was not approved.</p>" +
+                "<p><strong>Reason:</strong> " + reason + "</p>" +
+                (adminTeamEmail == null || adminTeamEmail.isBlank()
+                        ? ""
+                        : "<p>If you believe this is a mistake, contact us at " + adminTeamEmail + ".</p>") +
+                "<p>Best regards,<br>The " + fromName + " Team</p>" +
+                "</body>" +
+                "</html>";
+    }
+
+    private String buildAgentDeactivationBody(String roleName, String reason, String adminTeamEmail) {
+        return "<html>" +
+                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
+                "<h2>Account Update</h2>" +
+                "<p>Your " + roleName.replace("_", " ").toLowerCase() + " access has been deactivated.</p>" +
+                (reason == null || reason.isBlank() ? "" : "<p><strong>Reason:</strong> " + reason + "</p>") +
+                (adminTeamEmail == null || adminTeamEmail.isBlank()
+                        ? ""
+                        : "<p>If you believe this is a mistake, please reach out to our admin team at " + adminTeamEmail + ".</p>") +
                 "<p>Best regards,<br>The " + fromName + " Team</p>" +
                 "</body>" +
                 "</html>";

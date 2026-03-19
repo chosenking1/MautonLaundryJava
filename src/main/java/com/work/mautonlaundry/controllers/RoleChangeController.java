@@ -20,7 +20,7 @@ public class RoleChangeController {
     private final RoleChangeService roleChangeService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_CHANGE_CREATE')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('ROLE_CHANGE_CREATE')")
     public ResponseEntity<RoleChangeRequest> createRequest(@Valid @RequestBody CreateRoleChangeRequest request) {
         String userId = request.getUserId();
         String roleName = request.getRequestedRole();
@@ -30,7 +30,7 @@ public class RoleChangeController {
     }
 
     @PatchMapping("/{requestId}")
-    @PreAuthorize("hasAuthority('ROLE_CHANGE_UPDATE')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('ROLE_CHANGE_UPDATE')")
     public ResponseEntity<RoleChangeRequest> updateRequestStatus(
             @PathVariable Long requestId,
             @Valid @RequestBody UpdateRoleChangeStatusRequest request) {
@@ -40,14 +40,17 @@ public class RoleChangeController {
         if ("APPROVED".equals(status)) {
             return ResponseEntity.ok(roleChangeService.approveRequest(requestId));
         } else if ("REJECTED".equals(status)) {
-            return ResponseEntity.ok(roleChangeService.rejectRequest(requestId));
+            if (request.getReason() == null || request.getReason().isBlank()) {
+                throw new IllegalArgumentException("Rejection reason is required");
+            }
+            return ResponseEntity.ok(roleChangeService.rejectRequest(requestId, request.getReason()));
         } else {
             throw new IllegalArgumentException("Invalid status: " + status);
         }
     }
 
     @GetMapping("/pending")
-    @PreAuthorize("hasAuthority('ROLE_CHANGE_READ')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('ROLE_CHANGE_READ')")
     public ResponseEntity<List<RoleChangeRequest>> getPendingRequests() {
         return ResponseEntity.ok(roleChangeService.getPendingRequests());
     }

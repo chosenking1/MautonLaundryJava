@@ -44,7 +44,10 @@ public class PaymentServiceImpl implements PaymentService {
             throw new ConflictException("Payment already exists for this booking");
         });
 
-        BigDecimal amount = request.getAmount();
+        BigDecimal amount = booking.getTotalPrice();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            amount = request.getAmount();
+        }
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Payment amount must be greater than zero");
         }

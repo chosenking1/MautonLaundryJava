@@ -34,7 +34,6 @@ public class BookingService {
     private final AddressRepository addressRepository;
     private final ServiceRepository serviceRepository;
     private final ServicePricingRepository servicePricingRepository;
-    private final BookingResourceRepository bookingResourceRepository;
     private final AuditService auditService;
     private final LaundryAssignmentService laundryAssignmentService;
     private final DispatchEngine dispatchEngine;
@@ -43,6 +42,7 @@ public class BookingService {
     private final DeliveryAssignmentRepository deliveryAssignmentRepository;
     private final BookingStateMachine bookingStateMachine;
     private final StringRedisTemplate redisTemplate;
+    private final PricingEngine pricingEngine;
 
     @Transactional
     public CreateBookingResponse createBooking(CreateBookingRequest request, String idempotencyKey) {
@@ -61,8 +61,11 @@ public class BookingService {
         Address pickupAddress = addressRepository.findById(request.getPickupAddressId())
                 .orElseThrow(() -> new AddressNotFoundException("Address not found"));
         
-        // Calculate pricing using service-based pricing
-        BigDecimal totalPrice = calculateServiceBasedPrice(request.getItems(), request.getExpress());
+        // Calculate pricing using service-based pricing + delivery fee + express fee (config-based)
+        BigDecimal itemsTotal = calculateServiceBasedPrice(request.getItems());
+        BigDecimal deliveryFee = pricingEngine.calculateDeliveryFee(itemsTotal);
+        BigDecimal expressFee = pricingEngine.calculateExpressFee(Boolean.TRUE.equals(request.getExpress()));
+        BigDecimal totalPrice = itemsTotal.add(deliveryFee).add(expressFee);
         
         // Create booking with items
         Booking booking = new Booking();
@@ -71,6 +74,7 @@ public class BookingService {
         booking.setPickupAddress(pickupAddress);
         booking.setExpress(request.getExpress());
         booking.setTotalPrice(totalPrice);
+        booking.setDeliveryFee(deliveryFee);
         booking.setTrackingNumber(generateTrackingNumber());
         booking.setReturnDate(calculateReturnDate(request.getExpress()));
         booking.setStatus(BookingStatus.CREATED);
@@ -140,11 +144,7 @@ public class BookingService {
         response.setExpress(booking.getExpress());
         response.setReturnDate(booking.getReturnDate());
         response.setCreatedAt(booking.getCreatedAt());
-        bookingResourceRepository.findByBooking_Id(booking.getId()).ifPresent(resource -> {
-            response.setLaundryAgentId(resource.getLaundryAgentId());
-            response.setPickupAgentId(resource.getPickupAgentId());
-            response.setReturnAgentId(resource.getReturnAgentId());
-        });
+
         
         // Map address
         BookingDetailsResponse.AddressInfo addressInfo = new BookingDetailsResponse.AddressInfo();
@@ -253,7 +253,7 @@ public class BookingService {
                 || booking.getStatus() == BookingStatus.LAUNDRY_ASSIGNMENT_PENDING;
     }
 
-    private BigDecimal calculateServiceBasedPrice(List<BookingItemRequest> items, boolean express) {
+    private BigDecimal calculateServiceBasedPrice(List<BookingItemRequest> items) {
         BigDecimal total = BigDecimal.ZERO;
         
         for (BookingItemRequest item : items) {
@@ -266,10 +266,6 @@ public class BookingService {
             
             BigDecimal itemTotal = pricing.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             total = total.add(itemTotal);
-        }
-        
-        if (express) {
-            total = total.multiply(BigDecimal.valueOf(1.5));
         }
         
         return total;

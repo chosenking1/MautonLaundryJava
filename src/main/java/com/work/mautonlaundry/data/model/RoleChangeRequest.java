@@ -26,6 +26,10 @@ public class RoleChangeRequest {
     @JoinColumn(name = "requested_role_id", nullable = false)
     private Role requestedRole;
 
+    @ManyToOne
+    @JoinColumn(name = "agent_application_id")
+    private AgentApplication agentApplication;
+
     @Column(name = "requested_by_admin_id", nullable = false)
     private String requestedByAdminId;
 
@@ -35,6 +39,9 @@ public class RoleChangeRequest {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RequestStatus status;
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

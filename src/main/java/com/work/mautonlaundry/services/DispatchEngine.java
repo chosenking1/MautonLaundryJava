@@ -6,13 +6,17 @@ import com.work.mautonlaundry.data.model.Address;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.LaundrymanAssignment;
+import com.work.mautonlaundry.data.model.enums.BookingStatus;
 import com.work.mautonlaundry.data.model.enums.DeliveryAssignmentPhase;
 import com.work.mautonlaundry.data.model.enums.DeliveryAssignmentStatus;
 import com.work.mautonlaundry.data.model.enums.LaundrymanAssignmentStatus;
 import com.work.mautonlaundry.data.repository.AddressRepository;
+import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.data.repository.DeliveryAssignmentRepository;
 import com.work.mautonlaundry.data.repository.LaundrymanAssignmentRepository;
 import com.work.mautonlaundry.data.repository.UserRepository;
+import com.work.mautonlaundry.dtos.responses.deliveryresponse.AvailableDeliveryJobResponse;
+import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
 import com.work.mautonlaundry.services.dispatch.DispatchJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,13 +26,16 @@ import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.Metrics;
 import org.springframework.data.geo.Point;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -46,15 +53,21 @@ public class DispatchEngine {
     private final DeliveryAssignmentRepository deliveryAssignmentRepository;
     private final LaundrymanAssignmentRepository laundrymanAssignmentRepository;
     private final AddressRepository addressRepository;
+    private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final MetricsService metricsService;
+    private final GeoLocationService geoLocationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Value("${app.dispatch.fixed-delay-ms:30000}")
     private long dispatchDelayMs;
 
     @Value("${app.dispatch.job-ttl-seconds:600}")
     private long jobTtlSeconds;
+
+    @Value("${app.dispatch.retry-delay-seconds:120}")
+    private long dispatchRetryDelaySeconds;
 
     public void enqueueDispatchJob(Booking booking, DeliveryAssignmentPhase phase) {
         Address origin = resolveOriginAddress(booking, phase);
@@ -73,6 +86,18 @@ public class DispatchEngine {
         );
         pushJob(job);
         metricsService.incrementJobsCreated();
+    }
+
+    @Transactional
+    public void forceDispatchJob(String bookingId, DeliveryAssignmentPhase phase) {
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
+        DeliveryAssignmentPhase resolvedPhase = phase != null ? phase : resolvePhaseFromStatus(booking.getStatus());
+        if (resolvedPhase == null) {
+            throw new IllegalArgumentException("Booking is not in a dispatchable status: " + booking.getStatus());
+        }
+        enqueueDispatchJob(booking, resolvedPhase);
+        log.info("Forced dispatch job for booking {} phase {}", booking.getId(), resolvedPhase);
     }
 
     @Scheduled(fixedDelayString = "${app.dispatch.fixed-delay-ms:30000}")
@@ -100,6 +125,22 @@ public class DispatchEngine {
             long now = Instant.now().getEpochSecond();
             if (now - job.createdAt() > jobTtlSeconds) {
                 metricsService.incrementJobsExpired();
+                log.info("Dispatch job expired for booking {} phase {} (age={}s)",
+                        job.bookingId(), job.phase(), now - job.createdAt());
+                if (shouldRetry(job)) {
+                    DispatchJob retryJob = new DispatchJob(
+                            job.bookingId(),
+                            job.phase(),
+                            job.pickupLat(),
+                            job.pickupLng(),
+                            0,
+                            now + dispatchRetryDelaySeconds,
+                            now
+                    );
+                    pushJob(retryJob);
+                } else {
+                    redisTemplate.delete(DELIVERY_JOB_KEY.formatted(job.bookingId()));
+                }
                 continue;
             }
             if (job.nextAttemptAt() > now) {
@@ -137,10 +178,92 @@ public class DispatchEngine {
                 continue;
             }
             Optional<AppUser> agent = userRepository.findUserById(agentId);
-            agent.ifPresent(appUser ->
-                    notificationService.notifyDeliveryOffer(appUser.getEmail(), job.bookingId(), job.phase().name(), radiusKm)
+            if (agent.isEmpty()) {
+                continue;
+            }
+
+            Point agentPoint = getAgentLocation(agentId);
+            if (agentPoint == null) {
+                continue;
+            }
+
+            double distanceKm = geoLocationService.calculateDistance(
+                    agentPoint.getY(),
+                    agentPoint.getX(),
+                    job.pickupLat(),
+                    job.pickupLng()
+            );
+
+            AvailableDeliveryJobResponse payload = AvailableDeliveryJobResponse.builder()
+                    .bookingId(job.bookingId())
+                    .phase(job.phase())
+                    .pickupLat(job.pickupLat())
+                    .pickupLng(job.pickupLng())
+                    .distanceKm(distanceKm)
+                    .radiusKm(radiusKm)
+                    .createdAt(job.createdAt())
+                    .build();
+
+            messagingTemplate.convertAndSend("/topic/agent/" + agentId + "/offer", payload);
+            notificationService.notifyDeliveryOffer(
+                    agent.get().getEmail(),
+                    job.bookingId(),
+                    job.phase().name(),
+                    radiusKm
             );
         }
+    }
+
+    public List<AvailableDeliveryJobResponse> getAvailableJobsForAgent(String agentId) {
+        Point agentPoint = getAgentLocation(agentId);
+        if (agentPoint == null) {
+            return List.of();
+        }
+
+        Set<String> keys = redisTemplate.keys(DELIVERY_JOB_KEY.formatted("*"));
+        if (keys == null || keys.isEmpty()) {
+            return List.of();
+        }
+
+        long now = Instant.now().getEpochSecond();
+        List<AvailableDeliveryJobResponse> responses = new ArrayList<>();
+        for (String key : keys) {
+            String payload = redisTemplate.opsForValue().get(key);
+            if (payload == null || payload.isBlank()) {
+                continue;
+            }
+            DispatchJob job = parseJob(payload);
+            if (job == null) {
+                continue;
+            }
+            if (isJobAlreadyAssigned(job)) {
+                continue;
+            }
+            if (now - job.createdAt() > jobTtlSeconds) {
+                continue;
+            }
+            double radiusKm = RADIUS_STAGES_KM[Math.min(job.radiusIndex(), RADIUS_STAGES_KM.length - 1)];
+            double distanceKm = geoLocationService.calculateDistance(
+                    agentPoint.getY(),
+                    agentPoint.getX(),
+                    job.pickupLat(),
+                    job.pickupLng()
+            );
+            if (distanceKm > radiusKm) {
+                continue;
+            }
+            responses.add(AvailableDeliveryJobResponse.builder()
+                    .bookingId(job.bookingId())
+                    .phase(job.phase())
+                    .pickupLat(job.pickupLat())
+                    .pickupLng(job.pickupLng())
+                    .distanceKm(distanceKm)
+                    .radiusKm(radiusKm)
+                    .createdAt(job.createdAt())
+                    .build());
+        }
+
+        return responses;
     }
 
     private boolean isAgentOnline(String agentId) {
@@ -152,8 +275,16 @@ public class DispatchEngine {
         return deliveryAssignmentRepository.existsByBooking_IdAndPhaseAndStatusIn(
                 job.bookingId(),
                 job.phase(),
-                List.of(DeliveryAssignmentStatus.ACCEPTED)
+                DeliveryAssignmentStatus.activeAssignmentStatuses()
         );
+    }
+
+    private Point getAgentLocation(String agentId) {
+        var positions = redisTemplate.opsForGeo().position(DELIVERY_AGENTS_GEO_KEY, agentId);
+        if (positions == null || positions.isEmpty() || positions.get(0) == null) {
+            return null;
+        }
+        return positions.get(0);
     }
 
     private Address resolveOriginAddress(Booking booking, DeliveryAssignmentPhase phase) {
@@ -174,6 +305,28 @@ public class DispatchEngine {
                 .filter(addr -> addr.getLatitude() != null && addr.getLongitude() != null)
                 .findFirst()
                 .orElse(booking.getPickupAddress());
+    }
+
+    private boolean shouldRetry(DispatchJob job) {
+        Optional<Booking> bookingOpt = bookingRepository.findByIdAndDeletedFalse(job.bookingId());
+        if (bookingOpt.isEmpty()) {
+            return false;
+        }
+        Booking booking = bookingOpt.get();
+        if (job.phase() == DeliveryAssignmentPhase.PICKUP_FROM_CUSTOMER) {
+            return booking.getStatus() == BookingStatus.PICKUP_DISPATCH_PENDING;
+        }
+        return booking.getStatus() == BookingStatus.DELIVERY_DISPATCH_PENDING;
+    }
+
+    private DeliveryAssignmentPhase resolvePhaseFromStatus(BookingStatus status) {
+        if (status == BookingStatus.PICKUP_DISPATCH_PENDING) {
+            return DeliveryAssignmentPhase.PICKUP_FROM_CUSTOMER;
+        }
+        if (status == BookingStatus.DELIVERY_DISPATCH_PENDING) {
+            return DeliveryAssignmentPhase.RETURN_TO_CUSTOMER;
+        }
+        return null;
     }
 
     private void pushJob(DispatchJob job) {

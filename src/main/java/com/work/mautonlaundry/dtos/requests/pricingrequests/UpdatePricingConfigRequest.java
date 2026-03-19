@@ -1,6 +1,7 @@
 package com.work.mautonlaundry.dtos.requests.pricingrequests;
 
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 import java.math.BigDecimal;
 
@@ -8,5 +9,6 @@ import java.math.BigDecimal;
 public class UpdatePricingConfigRequest {
     private BigDecimal deliveryFee;
     private BigDecimal expressFee;
-    private BigDecimal minimumOrderAmount;
+    @JsonAlias({"minimumOrderAmount"})
+    private BigDecimal freeDeliveryThreshold;
 }

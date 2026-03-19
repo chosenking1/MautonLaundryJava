@@ -7,4 +7,6 @@ import lombok.Data;
 public class UpdateRoleChangeStatusRequest {
     @NotBlank(message = "Status is required")
     private String status;
+
+    private String reason;
 }

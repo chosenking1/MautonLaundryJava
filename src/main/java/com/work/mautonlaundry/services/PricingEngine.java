@@ -3,9 +3,11 @@ package com.work.mautonlaundry.services;
 import com.work.mautonlaundry.data.model.*;
 import com.work.mautonlaundry.data.repository.*;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.BookingItemRequest;
+import com.work.mautonlaundry.dtos.requests.pricingrequests.UpdatePricingConfigRequest;
 import com.work.mautonlaundry.dtos.responses.pricing.PricingConfigResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -54,20 +56,28 @@ public class PricingEngine {
         return getDeliveryFee();
     }
 
+    public BigDecimal calculateDeliveryFee(BigDecimal itemsTotal) {
+        return calculateDeliveryFee(itemsTotal, BigDecimal.ZERO);
+    }
+
+    public BigDecimal calculateExpressFee(boolean express) {
+        return express ? getExpressFee() : BigDecimal.ZERO;
+    }
+
     private BigDecimal getExpressFee() {
-        return pricingConfigRepository.findLatestByKey(PricingConfig.ConfigKey.EXPRESS_FEE.getValue())
+        return pricingConfigRepository.findTopByKeyOrderByEffectiveFromDesc(PricingConfig.ConfigKey.EXPRESS_FEE.getValue())
                 .map(config -> new BigDecimal(config.getValue()))
                 .orElse(BigDecimal.valueOf(10.00));
     }
 
     private BigDecimal getDeliveryFee() {
-        return pricingConfigRepository.findLatestByKey(PricingConfig.ConfigKey.DELIVERY_FEE.getValue())
+        return pricingConfigRepository.findTopByKeyOrderByEffectiveFromDesc(PricingConfig.ConfigKey.DELIVERY_FEE.getValue())
                 .map(config -> new BigDecimal(config.getValue()))
                 .orElse(BigDecimal.valueOf(5.00));
     }
 
     private BigDecimal getFreeDeliveryThreshold() {
-        return pricingConfigRepository.findLatestByKey(PricingConfig.ConfigKey.FREE_DELIVERY_THRESHOLD.getValue())
+        return pricingConfigRepository.findTopByKeyOrderByEffectiveFromDesc(PricingConfig.ConfigKey.FREE_DELIVERY_THRESHOLD.getValue())
                 .map(config -> new BigDecimal(config.getValue()))
                 .orElse(BigDecimal.valueOf(50.00));
     }
@@ -78,5 +88,35 @@ public class PricingEngine {
         response.setDeliveryFee(getDeliveryFee());
         response.setFreeDeliveryThreshold(getFreeDeliveryThreshold());
         return response;
+    }
+
+    @Transactional
+    public PricingConfigResponse updatePricingConfig(UpdatePricingConfigRequest request) {
+        boolean updated = false;
+        if (request.getExpressFee() != null) {
+            upsertConfig(PricingConfig.ConfigKey.EXPRESS_FEE, request.getExpressFee());
+            updated = true;
+        }
+        if (request.getDeliveryFee() != null) {
+            upsertConfig(PricingConfig.ConfigKey.DELIVERY_FEE, request.getDeliveryFee());
+            updated = true;
+        }
+        if (request.getFreeDeliveryThreshold() != null) {
+            upsertConfig(PricingConfig.ConfigKey.FREE_DELIVERY_THRESHOLD, request.getFreeDeliveryThreshold());
+            updated = true;
+        }
+        if (!updated) {
+            throw new IllegalArgumentException("No pricing values provided");
+        }
+        return getPricingConfig();
+    }
+
+    private void upsertConfig(PricingConfig.ConfigKey key, BigDecimal value) {
+        PricingConfig config = pricingConfigRepository.findByKey(key.getValue())
+                .orElseGet(PricingConfig::new);
+        config.setKey(key.getValue());
+        config.setValue(value.toPlainString());
+        config.setEffectiveFrom(java.time.LocalDateTime.now());
+        pricingConfigRepository.save(config);
     }
 }

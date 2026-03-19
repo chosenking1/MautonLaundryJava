@@ -51,7 +51,9 @@ public class TrackingService {
                     DeliveryAssignmentStatus.ENROUTE_FROM_LAUNDRY_TO_CUSTOMER,
                     DeliveryAssignmentStatus.ARRIVED_AT_CUSTOMER,
                     DeliveryAssignmentStatus.ARRIVED_AT_LAUNDRY,
-                    DeliveryAssignmentStatus.ARRIVED_AT_CUSTOMER_FOR_DELIVERY
+                    DeliveryAssignmentStatus.ARRIVED_AT_CUSTOMER_FOR_DELIVERY,
+                    DeliveryAssignmentStatus.PICKED_UP_FROM_CUSTOMER,
+                    DeliveryAssignmentStatus.PICKED_UP_FROM_LAUNDRY
             );
 
     private final StringRedisTemplate redisTemplate;
@@ -127,6 +129,45 @@ public class TrackingService {
         }
     }
 
+    @Transactional
+    public void handleAvailabilityLocationUpdate(String agentId, double latitude, double longitude, Long timestamp) {
+        AppUser agent = userRepository.findUserById(agentId)
+                .orElseThrow(() -> new UserNotFoundException("Delivery agent not found"));
+        if (!agent.hasRole("DELIVERY_AGENT")) {
+            throw new ForbiddenOperationException("User is not a delivery agent");
+        }
+
+        long resolvedTimestamp = resolveTimestamp(timestamp);
+        LiveLocationSnapshot snapshot = new LiveLocationSnapshot(latitude, longitude, resolvedTimestamp);
+
+        storeAgentLocation(agentId, snapshot);
+        updateAgentGeoIndex(agentId, snapshot);
+        updateAgentPresence(agentId);
+
+        if (!Boolean.TRUE.equals(agent.getOnline())) {
+            agent.setOnline(true);
+            userRepository.save(agent);
+        }
+    }
+
+    @Transactional
+    public void markAgentOnline(String agentId) {
+        updateAgentPresence(agentId);
+        userRepository.findUserById(agentId).ifPresent(user -> {
+            user.setOnline(true);
+            userRepository.save(user);
+        });
+    }
+
+    @Transactional
+    public void markAgentOffline(String agentId) {
+        redisTemplate.delete(AGENT_ONLINE_KEY.formatted(agentId));
+        userRepository.findUserById(agentId).ifPresent(user -> {
+            user.setOnline(false);
+            userRepository.save(user);
+        });
+    }
+
     private void storeLiveLocation(String agentId, String bookingId, LiveLocationSnapshot snapshot) {
         try {
             String payload = objectMapper.writeValueAsString(snapshot);
@@ -135,6 +176,15 @@ public class TrackingService {
             redisTemplate.opsForValue().set(TRACKING_KEY.formatted(bookingId), payload);
         } catch (JsonProcessingException ex) {
             log.warn("Failed to serialize live location for agent {}: {}", agentId, ex.getMessage());
+        }
+    }
+
+    private void storeAgentLocation(String agentId, LiveLocationSnapshot snapshot) {
+        try {
+            String payload = objectMapper.writeValueAsString(snapshot);
+            redisTemplate.opsForValue().set(AGENT_LOCATION_KEY.formatted(agentId), payload);
+        } catch (JsonProcessingException ex) {
+            log.warn("Failed to serialize availability location for agent {}: {}", agentId, ex.getMessage());
         }
     }
 

@@ -48,4 +48,6 @@ public interface UserService {
     
     // Current user method
     FindUserResponse getCurrentUser();
+
+    void deactivateAgent(String userId, String reason);
 }

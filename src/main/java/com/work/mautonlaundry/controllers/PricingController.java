@@ -41,9 +41,9 @@ public class PricingController {
     }
 
     @PutMapping("/config")
-    @PreAuthorize("hasAuthority('PRICING_UPDATE')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PRICING_UPDATE')")
     public ResponseEntity<MessageResponse> updatePricingConfig(@Valid @RequestBody UpdatePricingConfigRequest request) {
-        // Implementation for updating pricing config
+        pricingEngine.updatePricingConfig(request);
         return ResponseEntity.ok(new MessageResponse("Pricing configuration updated successfully"));
     }
 }
