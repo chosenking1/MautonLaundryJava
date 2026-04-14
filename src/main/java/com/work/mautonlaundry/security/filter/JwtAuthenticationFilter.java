@@ -35,15 +35,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
-        System.out.println("JWT Filter processing: " + request.getRequestURI()); // Debug log
         
-        // Get JWT token from HTTP request
         String token = getTokenFromRequest(request);
 
-        // Validate Token
         if(StringUtils.hasText(token) && !token.trim().isEmpty() && jwtTokenProvider.validateToken(token)){
-            // get username from token
             String username = jwtTokenProvider.getUsername(token);
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
@@ -64,13 +59,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private String getTokenFromRequest(HttpServletRequest request){
         String bearerToken = request.getHeader("Authorization");
-        
-        System.out.println("Authorization header: " + bearerToken); // Debug log
 
         if(StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")){
-            String token = bearerToken.substring(7, bearerToken.length());
-            System.out.println("Extracted token: " + (token.isEmpty() ? "EMPTY" : "Present")); // Debug log
-            return token;
+            return bearerToken.substring(7, bearerToken.length());
         }
 
         return null;

@@ -29,6 +29,20 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
 
+    private BigDecimal resolvePayableAmount(Booking booking, BigDecimal fallbackAmount) {
+        BigDecimal amount = booking.getFinalAmount();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            amount = booking.getTotalPrice();
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            amount = fallbackAmount;
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+        return amount;
+    }
+
     @Override
     @Transactional
     public CreatePaymentResponse createPayment(CreatePaymentRequest request) {
@@ -44,13 +58,7 @@ public class PaymentServiceImpl implements PaymentService {
             throw new ConflictException("Payment already exists for this booking");
         });
 
-        BigDecimal amount = booking.getTotalPrice();
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            amount = request.getAmount();
-        }
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Payment amount must be greater than zero");
-        }
+        BigDecimal amount = resolvePayableAmount(booking, request.getAmount());
 
         Payment payment = new Payment();
         payment.setBooking(booking);

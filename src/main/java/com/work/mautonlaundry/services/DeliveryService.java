@@ -216,6 +216,34 @@ public class DeliveryService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<DeliveryAssignmentSummaryResponse> getCompletedAssignmentsForAgent(String agentId) {
+        AppUser agent = userRepository.findUserById(agentId)
+                .orElseThrow(() -> new UserNotFoundException("Delivery agent not found"));
+        if (!agent.hasRole("DELIVERY_AGENT")) {
+            throw new ForbiddenOperationException("User is not a delivery agent");
+        }
+
+        List<DeliveryAssignment> assignments = deliveryAssignmentRepository.findByDeliveryAgentAndStatusIn(
+                agent,
+                List.of(DeliveryAssignmentStatus.COMPLETED)
+        );
+
+        return assignments.stream()
+                .sorted(Comparator.comparing(DeliveryAssignment::getCreatedAt).reversed())
+                .map(assignment -> {
+                    Booking booking = assignment.getBooking();
+                    return DeliveryAssignmentSummaryResponse.builder()
+                            .bookingId(booking.getId())
+                            .phase(assignment.getPhase().name())
+                            .routeStatus(assignment.getStatus().name())
+                            .assignmentStatus(assignment.getStatus().name())
+                            .bookingStatus(booking.getStatus().name())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
     private DeliveryAssignmentPhase parsePhase(String rawPhase) {
         String phaseStr = rawPhase == null ? null : rawPhase.trim().toUpperCase();
         if (phaseStr == null || phaseStr.isBlank()) {

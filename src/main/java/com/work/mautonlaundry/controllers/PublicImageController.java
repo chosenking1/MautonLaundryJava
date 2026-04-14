@@ -23,8 +23,18 @@ public class PublicImageController {
 
     @GetMapping("/{filename}")
     public ResponseEntity<Resource> getImage(@PathVariable String filename) {
+        if (filename == null || filename.isBlank() || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
+
         try {
-            Path filePath = Paths.get(uploadDir).resolve(filename);
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path filePath = uploadPath.resolve(filename).normalize();
+
+            if (!filePath.startsWith(uploadPath)) {
+                return ResponseEntity.badRequest().build();
+            }
+
             Resource resource = new UrlResource(filePath.toUri());
             
             if (resource.exists() && resource.isReadable()) {

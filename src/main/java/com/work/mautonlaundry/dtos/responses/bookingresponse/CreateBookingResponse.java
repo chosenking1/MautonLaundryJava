@@ -11,6 +11,9 @@ public class CreateBookingResponse {
     private String id;
     private String trackingNumber;
     private BigDecimal totalPrice;
+    private BigDecimal discountAmount;
+    private BigDecimal finalAmount;
+    private String discountCode;
     private LocalDateTime returnDate;
     private String status;
 }

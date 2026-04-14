@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.work.mautonlaundry.data.model.Payment;
 import com.work.mautonlaundry.data.model.enums.PaymentProvider;
+import com.work.mautonlaundry.exceptions.PaymentGatewayTimeoutException;
 import com.work.mautonlaundry.payments.gateway.PaymentGatewayAdapter;
 import com.work.mautonlaundry.payments.gateway.model.GatewayInitiationResult;
 import com.work.mautonlaundry.payments.gateway.model.GatewayWebhookEvent;
@@ -16,14 +17,21 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 @Component
 public class PaystackGatewayAdapter extends AbstractSandboxGatewayAdapter implements PaymentGatewayAdapter {
+    private static final Duration GATEWAY_CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration GATEWAY_REQUEST_TIMEOUT = Duration.ofSeconds(20);
+
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(GATEWAY_CONNECT_TIMEOUT)
+            .build();
     private final PaymentGatewayProperties properties;
     private final String appBaseUrl;
 
@@ -64,6 +72,7 @@ public class PaystackGatewayAdapter extends AbstractSandboxGatewayAdapter implem
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/transaction/initialize"))
+                    .timeout(GATEWAY_REQUEST_TIMEOUT)
                     .header("Authorization", "Bearer " + secretKey)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -90,6 +99,8 @@ public class PaystackGatewayAdapter extends AbstractSandboxGatewayAdapter implem
             String returnedReference = data.get("reference") == null ? reference : data.get("reference").toString();
 
             return new GatewayInitiationResult(returnedReference, authUrl, accessCode, response.body());
+        } catch (HttpTimeoutException ex) {
+            throw new PaymentGatewayTimeoutException("Payment gateway timed out before checkout could start", ex);
         } catch (IllegalArgumentException ex) {
             throw ex;
         } catch (Exception ex) {

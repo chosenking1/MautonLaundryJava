@@ -14,6 +14,9 @@ public class BookingDetailsResponse {
     private String bookingType;
     private String status;
     private BigDecimal totalPrice;
+    private BigDecimal discountAmount;
+    private BigDecimal finalAmount;
+    private String discountCode;
     private BigDecimal deliveryFee;
     private Boolean express;
     private LocalDateTime returnDate;

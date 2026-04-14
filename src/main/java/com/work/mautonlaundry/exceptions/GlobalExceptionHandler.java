@@ -82,6 +82,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
+    @ExceptionHandler(PaymentGatewayTimeoutException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentGatewayTimeout(PaymentGatewayTimeoutException ex) {
+        ErrorResponse error = new ErrorResponse("PAYMENT_GATEWAY_TIMEOUT", ex.getMessage(), LocalDateTime.now());
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(error);
+    }
+
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(NoSuchElementException ex) {
         ErrorResponse error = new ErrorResponse("NOT_FOUND", ex.getMessage(), LocalDateTime.now());

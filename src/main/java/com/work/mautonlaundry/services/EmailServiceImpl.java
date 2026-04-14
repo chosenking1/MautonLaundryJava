@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -30,6 +31,7 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendVerificationEmail(String email, String token) {
         String verificationUrl = baseUrl + "/api/auth/verify-email?token=" + token;
         String subject = "Verify Your Email - " + fromName;
@@ -38,6 +40,7 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendPasswordResetEmail(String email, String token) {
         String resetUrl = baseUrl + "/api/auth/reset-password?token=" + token;
         String subject = "Password Reset - " + fromName;
@@ -46,6 +49,7 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendBookingNotification(String email, String bookingId, String status) {
         String subject = "Booking Update - " + fromName;
         String body = buildBookingNotificationBody(bookingId, status);
@@ -53,6 +57,7 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendAgentApplicationSubmitted(String email, String roleName, int locationsCount, String adminTeamEmail) {
         String subject = "Agent Application Received - " + fromName;
         String body = buildAgentApplicationSubmittedBody(roleName, locationsCount, adminTeamEmail);
@@ -60,6 +65,7 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendAdminAgentApplicationNotification(String adminEmail, String applicantEmail, String roleName, int locationsCount) {
         if (adminEmail == null || adminEmail.isBlank()) {
             log.warn("Admin team email not configured. Skipping admin notification.");
@@ -71,6 +77,7 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendAgentApplicationApproved(String email, String roleName) {
         String subject = "Application Approved - " + fromName;
         String body = buildAgentApplicationApprovedBody(roleName);
@@ -78,6 +85,7 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendAgentApplicationRejected(String email, String roleName, String reason, String adminTeamEmail) {
         String subject = "Application Update - " + fromName;
         String body = buildAgentApplicationRejectedBody(roleName, reason, adminTeamEmail);
@@ -85,6 +93,7 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    @Async
     public void sendAgentDeactivated(String email, String roleName, String adminTeamEmail, String reason) {
         String subject = "Account Update - " + fromName;
         String body = buildAgentDeactivationBody(roleName, reason, adminTeamEmail);
@@ -228,6 +237,26 @@ public class EmailServiceImpl implements EmailService {
                 (adminTeamEmail == null || adminTeamEmail.isBlank()
                         ? ""
                         : "<p>If you believe this is a mistake, please reach out to our admin team at " + adminTeamEmail + ".</p>") +
+                "<p>Best regards,<br>The " + fromName + " Team</p>" +
+                "</body>" +
+                "</html>";
+    }
+
+    @Override
+    @Async
+    public void sendDiscountApprovedEmail(String email, String discountName) {
+        String subject = "Discount Approved - " + fromName;
+        String body = buildDiscountApprovedBody(discountName);
+        sendEmail(email, subject, body);
+    }
+
+    private String buildDiscountApprovedBody(String discountName) {
+        return "<html>" +
+                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
+                "<h2>Discount Approved!</h2>" +
+                "<p>Great news! Your discount code has been verified and is now active.</p>" +
+                "<p>You can now use your discount on your next order.</p>" +
+                "<p>Thank you for choosing " + fromName + "!</p>" +
                 "<p>Best regards,<br>The " + fromName + " Team</p>" +
                 "</body>" +
                 "</html>";

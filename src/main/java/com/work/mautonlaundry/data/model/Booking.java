@@ -52,6 +52,15 @@ public class Booking {
     @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;
 
+    @Column(name = "discount_code", length = 50)
+    private String discountCode;
+
+    @Column(name = "discount_amount", precision = 10, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "final_amount", precision = 10, scale = 2)
+    private BigDecimal finalAmount;
+
     @Column(name = "tracking_number", unique = true)
     private String trackingNumber;
 

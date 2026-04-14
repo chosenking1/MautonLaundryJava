@@ -34,5 +34,10 @@ public class SecurityUtil {
 
         return Optional.empty();
     }
+
+    public static String getCurrentUserId() {
+        Optional<AppUser> user = getCurrentUser();
+        return user.isPresent() ? user.get().getId() : null;
+    }
 }
 

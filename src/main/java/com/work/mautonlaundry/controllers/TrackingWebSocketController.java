@@ -6,13 +6,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.stereotype.Controller;
 
+import java.security.Principal;
+
 @Controller
 @RequiredArgsConstructor
 public class TrackingWebSocketController {
     private final TrackingService trackingService;
 
     @MessageMapping("/location")
-    public void handleLocationUpdate(DeliveryLocationUpdateMessage message) {
-        trackingService.handleLocationUpdate(message);
+    public void handleLocationUpdate(DeliveryLocationUpdateMessage message, Principal principal) {
+        trackingService.handleLocationUpdate(message, principal);
     }
 }

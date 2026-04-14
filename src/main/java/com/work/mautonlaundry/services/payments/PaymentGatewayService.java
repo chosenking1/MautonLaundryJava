@@ -32,6 +32,20 @@ public class PaymentGatewayService {
     private final BookingRepository bookingRepository;
     private final PaymentGatewayRouter gatewayRouter;
 
+    private BigDecimal resolvePayableAmount(Booking booking, BigDecimal fallbackAmount) {
+        BigDecimal amount = booking.getFinalAmount();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            amount = booking.getTotalPrice();
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            amount = fallbackAmount;
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+        return amount;
+    }
+
     @Transactional
     public GatewayPaymentInitiationResponse initiatePayment(InitiateGatewayPaymentRequest request) {
         Booking booking = bookingRepository.findByIdAndDeletedFalse(request.getBookingId())
@@ -50,13 +64,7 @@ public class PaymentGatewayService {
             }
         });
 
-        BigDecimal amount = booking.getTotalPrice();
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            amount = request.getAmount();
-        }
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Payment amount must be greater than zero");
-        }
+        BigDecimal amount = resolvePayableAmount(booking, request.getAmount());
 
         Payment payment = paymentRepository.findByBooking_Id(booking.getId()).orElseGet(Payment::new);
         payment.setBooking(booking);

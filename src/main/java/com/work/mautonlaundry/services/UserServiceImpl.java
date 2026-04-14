@@ -171,8 +171,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         AppUser user = userRepository.findUserByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
 
-        log.debug("Loaded user: {} with password {}", username, user.getPassword()); // Added logging
-        log.debug("Password length: {}", user.getPassword().length());
+        log.debug("Loaded user details for {}", username);
 
         Set<GrantedAuthority> authorities = new HashSet<>();
         if (user.getRole() != null) {
@@ -312,7 +311,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         VerificationToken verificationToken = new VerificationToken(token, user, VerificationToken.TokenType.EMAIL_VERIFICATION, verificationTokenExpiryHours);
         tokenRepository.save(verificationToken);
         
-        log.info("Sending verification email to: {} with token: {}", email, token);
+        log.info("Sending verification email to: {}", email);
         emailService.sendVerificationEmail(email, token);
         log.info("Verification email sent successfully to: {}", email);
     }

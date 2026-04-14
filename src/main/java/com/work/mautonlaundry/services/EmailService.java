@@ -9,4 +9,5 @@ public interface EmailService {
     void sendAgentApplicationApproved(String email, String roleName);
     void sendAgentApplicationRejected(String email, String roleName, String reason, String adminTeamEmail);
     void sendAgentDeactivated(String email, String roleName, String adminTeamEmail, String reason);
+    void sendDiscountApprovedEmail(String email, String discountName);
 }

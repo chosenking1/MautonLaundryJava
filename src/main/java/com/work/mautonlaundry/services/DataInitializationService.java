@@ -7,6 +7,7 @@ import com.work.mautonlaundry.data.repository.PermissionRepository;
 import com.work.mautonlaundry.data.repository.RoleRepository;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,12 @@ public class DataInitializationService implements CommandLineRunner {
     
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Value("${app.bootstrap.admin.email:}")
+    private String bootstrapAdminEmail;
+
+    @Value("${app.bootstrap.admin.password:}")
+    private String bootstrapAdminPassword;
     
     @Override
     public void run(String... args) {
@@ -151,19 +158,26 @@ public class DataInitializationService implements CommandLineRunner {
     }
     
     private void initializeAdminUser() {
-        if (!userRepository.existsByEmail("Admin@mail.com")) {
-            AppUser adminUser = new AppUser();
-            adminUser.setEmail("Admin@mail.com");
-            adminUser.setPassword(passwordEncoder.encode("password"));
-            adminUser.setFull_name("Admin User");
-            adminUser.setPhone_number("1234567890");
-            adminUser.setEmailVerified(true);
-            
-            Role adminRole = roleRepository.findByName("ADMIN")
-                    .orElseThrow(() -> new RuntimeException("ADMIN role not found"));
-            adminUser.setRole(adminRole);
-            
-            userRepository.save(adminUser);
+        if (bootstrapAdminEmail == null || bootstrapAdminEmail.isBlank()
+                || bootstrapAdminPassword == null || bootstrapAdminPassword.isBlank()) {
+            return;
         }
+
+        if (userRepository.existsByEmail(bootstrapAdminEmail)) {
+            return;
+        }
+
+        AppUser adminUser = new AppUser();
+        adminUser.setEmail(bootstrapAdminEmail.trim());
+        adminUser.setPassword(passwordEncoder.encode(bootstrapAdminPassword));
+        adminUser.setFull_name("Bootstrap Admin");
+        adminUser.setPhone_number("0000000000");
+        adminUser.setEmailVerified(true);
+
+        Role adminRole = roleRepository.findByName("ADMIN")
+                .orElseThrow(() -> new RuntimeException("ADMIN role not found"));
+        adminUser.setRole(adminRole);
+
+        userRepository.save(adminUser);
     }
 }

@@ -25,6 +25,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.Principal;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -65,11 +66,15 @@ public class TrackingService {
     private final DeliveryRouteHistoryRepository deliveryRouteHistoryRepository;
 
     @Transactional
-    public void handleLocationUpdate(DeliveryLocationUpdateMessage message) {
+    public void handleLocationUpdate(DeliveryLocationUpdateMessage message, Principal principal) {
+        if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+            throw new ForbiddenOperationException("Authenticated WebSocket session is required");
+        }
+
+        AppUser agent = userRepository.findUserByEmail(principal.getName())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated agent not found"));
         Booking booking = bookingRepository.findByIdAndDeletedFalse(message.getBookingId())
                 .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
-        AppUser agent = userRepository.findUserById(message.getAgentId())
-                .orElseThrow(() -> new UserNotFoundException("Delivery agent not found"));
 
         if (!agent.hasRole("DELIVERY_AGENT")) {
             throw new ForbiddenOperationException("User is not a delivery agent");

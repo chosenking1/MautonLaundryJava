@@ -25,6 +25,12 @@ public class AdminBookingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String status) {
+        if (size > 100) {
+            size = 100;
+        }
+        if (size < 1) {
+            size = 10;
+        }
         Pageable pageable = PageRequest.of(page, size);
         if (status == null || status.isBlank()) {
             return ResponseEntity.ok(bookingService.getAllBookings(pageable));

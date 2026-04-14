@@ -25,6 +25,8 @@ import org.springframework.data.geo.Circle;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.Metrics;
 import org.springframework.data.geo.Point;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -220,7 +222,7 @@ public class DispatchEngine {
             return List.of();
         }
 
-        Set<String> keys = redisTemplate.keys(DELIVERY_JOB_KEY.formatted("*"));
+        Set<String> keys = findJobKeysUsingScan();
         if (keys == null || keys.isEmpty()) {
             return List.of();
         }
@@ -264,6 +266,19 @@ public class DispatchEngine {
         }
 
         return responses;
+    }
+
+    private Set<String> findJobKeysUsingScan() {
+        Set<String> keys = new java.util.HashSet<>();
+        ScanOptions options = ScanOptions.scanOptions().match(DELIVERY_JOB_KEY.formatted("*")).count(100).build();
+        try (var cursor = redisTemplate.scan(options)) {
+            while (cursor.hasNext()) {
+                keys.add((String) cursor.next());
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to scan for job keys: {}", ex.getMessage());
+        }
+        return keys;
     }
 
     private boolean isAgentOnline(String agentId) {

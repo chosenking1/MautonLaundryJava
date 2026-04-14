@@ -59,6 +59,11 @@ A comprehensive laundry service management system built with Spring Boot, provid
    - Swagger UI: `http://localhost:8079/swagger-ui.html`
    - API runs on port: `8079`
 
+### Release Note
+
+- Before deploying the discount-enabled build to production, apply [discount_schema_updates.sql](/Users/joshuasofowora/IdeaProjects/MautonLaundryJava/discount_schema_updates.sql) to the production database.
+- Production is configured with `spring.jpa.hibernate.ddl-auto=validate`, so the schema must already contain the discount tables and booking pricing columns before startup.
+
 ## Project Structure
 
 ```
@@ -104,3 +109,8 @@ All endpoints documented via Swagger UI. Key operations:
 # Package
 ./mvnw package
 ```
+
+Environment Variables Required for Production
+DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET, REDIS_HOST, REDIS_PORT,
+MAIL_USERNAME, MAIL_PASSWORD, PUBLIC_BASE_URL, CORS_ALLOWED_ORIGINS,
+MONNIFY_*, PAYSTACK_*, SQUAD_*

@@ -3,6 +3,7 @@ package com.work.mautonlaundry.security.config;
 import com.work.mautonlaundry.security.filter.DynamicPermissionFilter;
 import com.work.mautonlaundry.security.filter.JwtAuthenticationEntryPoint;
 import com.work.mautonlaundry.security.filter.JwtAuthenticationFilter;
+import com.work.mautonlaundry.security.filter.RateLimitFilter;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,6 +32,7 @@ public class BasicConfiguration{
     private JwtAuthenticationEntryPoint authenticationEntryPoint;
     private JwtAuthenticationFilter authenticationFilter;
     private DynamicPermissionFilter dynamicPermissionFilter;
+    private RateLimitFilter rateLimitFilter;
 
 
 
@@ -59,6 +61,7 @@ public class BasicConfiguration{
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(dynamicPermissionFilter, JwtAuthenticationFilter.class)
                 .exceptionHandling(exception -> exception

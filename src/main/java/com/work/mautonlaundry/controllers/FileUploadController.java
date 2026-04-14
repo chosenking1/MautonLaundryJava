@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -22,6 +23,11 @@ import java.util.UUID;
 public class FileUploadController {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
+
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".gif", ".webp");
+    private static final Set<String> ALLOWED_MIME_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
+
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -35,27 +41,40 @@ public class FileUploadController {
             throw new IllegalArgumentException("File is empty");
         }
 
-        try {
-            log.info("Uploading image: originalName={}, size={} bytes", file.getOriginalFilename(), file.getSize());
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException("File size exceeds maximum allowed size of 10MB");
+        }
 
-            // Create upload directory if it doesn't exist
-            Path uploadPath = Paths.get(uploadDir);
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            throw new IllegalArgumentException("Invalid filename");
+        }
+
+        String extension = "";
+        int lastDot = originalFilename.lastIndexOf(".");
+        if (lastDot >= 0) {
+            extension = originalFilename.substring(lastDot).toLowerCase();
+        }
+
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new IllegalArgumentException("File type not allowed. Allowed types: " + String.join(", ", ALLOWED_EXTENSIONS));
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException("Invalid file content type");
+        }
+
+        try {
+            log.info("Uploading image: originalName={}, size={} bytes", originalFilename, file.getSize());
+
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
-            // Generate unique filename
-            String originalFilename = file.getOriginalFilename();
-            String extension = "";
-            if (originalFilename != null) {
-                int lastDot = originalFilename.lastIndexOf(".");
-                if (lastDot >= 0) {
-                    extension = originalFilename.substring(lastDot);
-                }
-            }
             String filename = UUID.randomUUID().toString() + extension;
             
-            // Save file
             Path filePath = uploadPath.resolve(filename);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
             log.info("Image uploaded successfully: {}", filePath);

@@ -4,9 +4,11 @@ import com.work.mautonlaundry.data.model.*;
 import com.work.mautonlaundry.data.model.enums.BookingStatus;
 import com.work.mautonlaundry.data.model.enums.BookingType;
 import com.work.mautonlaundry.data.repository.*;
+import com.work.mautonlaundry.dtos.requests.bookingrequests.BookingEstimateRequest;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.BookingItemRequest;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.CreateBookingRequest;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingDetailsResponse;
+import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingEstimateResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.CreateBookingResponse;
 import com.work.mautonlaundry.exceptions.ForbiddenOperationException;
 import com.work.mautonlaundry.exceptions.addressexception.AddressNotFoundException;
@@ -75,6 +77,7 @@ public class BookingService {
         booking.setExpress(request.getExpress());
         booking.setTotalPrice(totalPrice);
         booking.setDeliveryFee(deliveryFee);
+        booking.setFinalAmount(totalPrice);
         booking.setTrackingNumber(generateTrackingNumber());
         booking.setReturnDate(calculateReturnDate(request.getExpress()));
         booking.setStatus(BookingStatus.CREATED);
@@ -95,6 +98,21 @@ public class BookingService {
             redisTemplate.opsForValue().set(bookingIdKey, savedBooking.getId(), Duration.ofHours(24));
         }
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public BookingEstimateResponse estimateBooking(BookingEstimateRequest request) {
+        BigDecimal itemsTotal = calculateServiceBasedPrice(request.getItems());
+        BigDecimal deliveryFee = pricingEngine.calculateDeliveryFee(itemsTotal);
+        BigDecimal expressFee = pricingEngine.calculateExpressFee(Boolean.TRUE.equals(request.getExpress()));
+        BigDecimal total = itemsTotal.add(deliveryFee).add(expressFee);
+        return BookingEstimateResponse.builder()
+                .itemsTotal(itemsTotal)
+                .deliveryFee(deliveryFee)
+                .expressFee(expressFee)
+                .total(total)
+                .freeDelivery(deliveryFee.compareTo(BigDecimal.ZERO) == 0)
+                .build();
     }
 
     public BookingDetailsResponse getBookingDetails(String bookingId) {
@@ -140,6 +158,9 @@ public class BookingService {
         response.setBookingType(booking.getBookingType().name());
         response.setStatus(booking.getStatus().name());
         response.setTotalPrice(booking.getTotalPrice());
+        response.setDiscountAmount(booking.getDiscountAmount());
+        response.setFinalAmount(booking.getFinalAmount());
+        response.setDiscountCode(booking.getDiscountCode());
         response.setDeliveryFee(booking.getDeliveryFee());
         response.setExpress(booking.getExpress());
         response.setReturnDate(booking.getReturnDate());
@@ -152,7 +173,10 @@ public class BookingService {
         addressInfo.setLine1(booking.getPickupAddress().getStreet() + " " + booking.getPickupAddress().getStreet_number());
         addressInfo.setCity(booking.getPickupAddress().getCity());
         response.setPickupAddress(addressInfo);
-        
+
+        // Map items
+        response.setItems(mapBookingItems(booking));
+
         return response;
     }
 
@@ -165,17 +189,13 @@ public class BookingService {
             bookings = bookingRepository.findByUserAndDeletedFalse(currentUser, pageable);
         }
         
-        return bookings.map(booking -> {
-            BookingDetailsResponse response = new BookingDetailsResponse();
-            response.setId(booking.getId());
-            response.setTrackingNumber(booking.getTrackingNumber());
-            response.setBookingType(booking.getBookingType().name());
-            response.setStatus(booking.getStatus().name());
-            response.setTotalPrice(booking.getTotalPrice());
-            response.setReturnDate(booking.getReturnDate());
-            response.setCreatedAt(booking.getCreatedAt());
-            return response;
-        });
+        return mapBookingsToDetails(bookings);
+    }
+
+    public Page<BookingDetailsResponse> getUserBookingsByStatuses(Pageable pageable, List<BookingStatus> statuses) {
+        AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
+        Page<Booking> bookings = bookingRepository.findByUserAndStatusInAndDeletedFalse(currentUser, statuses, pageable);
+        return mapBookingsToDetails(bookings);
     }
 
     public Page<BookingDetailsResponse> getAllBookings(Pageable pageable) {
@@ -196,10 +216,38 @@ public class BookingService {
             response.setBookingType(booking.getBookingType().name());
             response.setStatus(booking.getStatus().name());
             response.setTotalPrice(booking.getTotalPrice());
+            response.setDiscountAmount(booking.getDiscountAmount());
+            response.setFinalAmount(booking.getFinalAmount());
+            response.setDiscountCode(booking.getDiscountCode());
             response.setReturnDate(booking.getReturnDate());
             response.setCreatedAt(booking.getCreatedAt());
+            response.setItems(mapBookingItems(booking));
+
+            if (booking.getPickupAddress() != null) {
+                BookingDetailsResponse.AddressInfo addressInfo = new BookingDetailsResponse.AddressInfo();
+                addressInfo.setLabel("Address");
+                addressInfo.setLine1(booking.getPickupAddress().getStreet() + " " + booking.getPickupAddress().getStreet_number());
+                addressInfo.setCity(booking.getPickupAddress().getCity());
+                response.setPickupAddress(addressInfo);
+            }
+
             return response;
         });
+    }
+
+    private List<BookingDetailsResponse.BookingItemInfo> mapBookingItems(Booking booking) {
+        if (booking.getItems() == null) {
+            return List.of();
+        }
+        return booking.getItems().stream().map(item -> {
+            BookingDetailsResponse.BookingItemInfo info = new BookingDetailsResponse.BookingItemInfo();
+            info.setItemName(item.getService().getName() + " - " + item.getItemType());
+            info.setQuantity(item.getQuantity());
+            info.setColorType(item.getItemType());
+            info.setUnitPrice(item.getUnitPrice());
+            info.setTotalPrice(item.getTotalPrice());
+            return info;
+        }).toList();
     }
 
     @Transactional
@@ -301,6 +349,9 @@ public class BookingService {
         response.setId(booking.getId());
         response.setTrackingNumber(booking.getTrackingNumber());
         response.setTotalPrice(booking.getTotalPrice());
+        response.setDiscountAmount(booking.getDiscountAmount());
+        response.setFinalAmount(booking.getFinalAmount());
+        response.setDiscountCode(booking.getDiscountCode());
         response.setReturnDate(booking.getReturnDate());
         response.setStatus(booking.getStatus().name());
         return response;
@@ -343,32 +394,33 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
 
-        if (booking.getStatus() == BookingStatus.AT_LAUNDRY) {
-            bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.WASHING);
-            BookingStatus oldStatus = booking.getStatus();
+        BookingStatus currentStatus = booking.getStatus();
+        
+        if (currentStatus == BookingStatus.AT_LAUNDRY) {
+            bookingStateMachine.validateTransition(currentStatus, BookingStatus.WASHING);
             booking.setStatus(BookingStatus.WASHING);
             bookingRepository.save(booking);
             notificationService.notifyUserBookingStatusChange(
                     booking.getUser().getEmail(),
                     booking.getId(),
-                    oldStatus.name(),
+                    currentStatus.name(),
                     BookingStatus.WASHING.name()
             );
+            currentStatus = BookingStatus.WASHING;
         }
 
-        bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.READY_FOR_DELIVERY);
-        BookingStatus oldStatus = booking.getStatus();
+        bookingStateMachine.validateTransition(currentStatus, BookingStatus.READY_FOR_DELIVERY);
         booking.setStatus(BookingStatus.READY_FOR_DELIVERY);
         bookingRepository.save(booking);
         notificationService.notifyUserBookingStatusChange(
                 booking.getUser().getEmail(),
                 booking.getId(),
-                oldStatus.name(),
+                currentStatus.name(),
                 BookingStatus.READY_FOR_DELIVERY.name()
         );
         notificationService.notifyLaundryReady(booking.getUser().getEmail(), booking.getId());
 
-        bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.DELIVERY_DISPATCH_PENDING);
+        bookingStateMachine.validateTransition(BookingStatus.READY_FOR_DELIVERY, BookingStatus.DELIVERY_DISPATCH_PENDING);
         booking.setStatus(BookingStatus.DELIVERY_DISPATCH_PENDING);
         bookingRepository.save(booking);
         dispatchEngine.enqueueDispatchJob(booking, com.work.mautonlaundry.data.model.enums.DeliveryAssignmentPhase.RETURN_TO_CUSTOMER);
@@ -424,5 +476,37 @@ public class BookingService {
         bookingRepository.save(booking);
 
         auditService.logAction("CANCEL", "BOOKING", bookingId);
+    }
+
+    @Transactional
+    public void respondToEarlyDelivery(String bookingId, boolean acceptTomorrow) {
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
+
+        AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
+        if (!booking.getUser().getId().equals(currentUser.getId())) {
+            throw new ForbiddenOperationException("You can only respond to early delivery for your own bookings");
+        }
+
+        booking.setCustomerEarlyDeliveryOptIn(acceptTomorrow);
+        booking.setCustomerEarlyDeliveryDecisionAt(LocalDateTime.now());
+        bookingRepository.save(booking);
+
+        auditService.logAction("EARLY_DELIVERY_RESPONSE", "BOOKING", 
+                acceptTomorrow ? "ACCEPTED" : "DECLINED");
+    }
+
+    public java.util.Map<String, Double> getDeliveryCoordinates(String bookingId) {
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
+
+        Address pickupAddress = booking.getPickupAddress();
+        if (pickupAddress != null && pickupAddress.getLatitude() != null && pickupAddress.getLongitude() != null) {
+            java.util.Map<String, Double> coords = new java.util.HashMap<>();
+            coords.put("latitude", pickupAddress.getLatitude().doubleValue());
+            coords.put("longitude", pickupAddress.getLongitude().doubleValue());
+            return coords;
+        }
+        return null;
     }
 }

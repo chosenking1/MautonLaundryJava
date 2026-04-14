@@ -27,6 +27,8 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     
     Page<Booking> findByDeletedFalse(Pageable pageable);
     Page<Booking> findByStatusAndDeletedFalse(BookingStatus status, Pageable pageable);
+
+    Page<Booking> findByUserAndStatusInAndDeletedFalse(AppUser user, List<BookingStatus> statuses, Pageable pageable);
     
     Optional<Booking> findByIdAndDeletedFalse(String id);
 

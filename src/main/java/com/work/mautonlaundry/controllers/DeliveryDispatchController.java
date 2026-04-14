@@ -45,6 +45,13 @@ public class DeliveryDispatchController {
         return ResponseEntity.ok(deliveryService.getActiveAssignmentsForAgent(agentId));
     }
 
+    @GetMapping("/assignments/completed")
+    @PreAuthorize("hasRole('DELIVERY_AGENT')")
+    public ResponseEntity<List<DeliveryAssignmentSummaryResponse>> getCompletedAssignments() {
+        String agentId = SecurityUtil.getCurrentUser().orElseThrow().getId();
+        return ResponseEntity.ok(deliveryService.getCompletedAssignmentsForAgent(agentId));
+    }
+
     @PostMapping("/accept")
     @PreAuthorize("hasAuthority('DELIVERY_UPDATE')")
     public ResponseEntity<AcceptDeliveryJobResponse> acceptDeliveryJob(
