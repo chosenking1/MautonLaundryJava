@@ -33,3 +33,12 @@ build/
 .vscode/
 /uploads
 /src/test
+*.docx
+*.md
+*.db
+*.sql
+.DS_Store
+src/main/resources/application-dev.properties
+src/main/resources/application-dev.properties
+*.properties
+src/main/resources/application-dev.properties
