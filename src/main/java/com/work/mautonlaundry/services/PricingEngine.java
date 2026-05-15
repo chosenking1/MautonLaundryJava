@@ -48,16 +48,26 @@ public class PricingEngine {
 
     private BigDecimal calculateDeliveryFee(BigDecimal itemsTotal, BigDecimal deliveryDistance) {
         BigDecimal freeDeliveryThreshold = getFreeDeliveryThreshold();
-        
-        if (itemsTotal.compareTo(freeDeliveryThreshold) >= 0) {
+
+        if (freeDeliveryThreshold != null
+                && freeDeliveryThreshold.compareTo(BigDecimal.ZERO) > 0
+                && itemsTotal.compareTo(freeDeliveryThreshold) >= 0) {
             return BigDecimal.ZERO;
         }
-        
+
         return getDeliveryFee();
     }
 
     public BigDecimal calculateDeliveryFee(BigDecimal itemsTotal) {
         return calculateDeliveryFee(itemsTotal, BigDecimal.ZERO);
+    }
+
+    public boolean isFreeDeliveryTierMet(BigDecimal itemsTotal) {
+        BigDecimal threshold = getFreeDeliveryThreshold();
+        return threshold != null
+                && threshold.compareTo(BigDecimal.ZERO) > 0
+                && itemsTotal != null
+                && itemsTotal.compareTo(threshold) >= 0;
     }
 
     public BigDecimal calculateExpressFee(boolean express) {
@@ -79,7 +89,7 @@ public class PricingEngine {
     private BigDecimal getFreeDeliveryThreshold() {
         return pricingConfigRepository.findTopByKeyOrderByEffectiveFromDesc(PricingConfig.ConfigKey.FREE_DELIVERY_THRESHOLD.getValue())
                 .map(config -> new BigDecimal(config.getValue()))
-                .orElse(BigDecimal.valueOf(50.00));
+                .orElse(BigDecimal.ZERO);
     }
 
     public PricingConfigResponse getPricingConfig() {

@@ -51,7 +51,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<UserLoginResponse> login(@Valid @RequestBody UserLoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody UserLoginRequest request) {
         log.info("Login attempt for email: {}", request.getEmail());
         try {
             String token = authService.login(request);
@@ -62,7 +62,11 @@ public class AuthController {
         } catch (Exception e) {
             auditService.logAction("LOGIN_FAILED", "AUTH", request.getEmail());
             log.warn("Login failed for email: {} - {}", request.getEmail(), e.getMessage());
-            return ResponseEntity.badRequest().build();
+            String message = e.getMessage() != null ? e.getMessage() : "Login failed";
+            HttpStatus status = message.toLowerCase().contains("email not verified")
+                    ? HttpStatus.FORBIDDEN
+                    : HttpStatus.BAD_REQUEST;
+            return ResponseEntity.status(status).body(java.util.Map.of("message", message));
         }
     }
 

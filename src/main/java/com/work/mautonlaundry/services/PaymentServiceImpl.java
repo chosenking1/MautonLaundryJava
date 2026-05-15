@@ -3,6 +3,7 @@ package com.work.mautonlaundry.services;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.Payment;
+import com.work.mautonlaundry.data.model.enums.BookingStatus;
 import com.work.mautonlaundry.data.model.enums.PaymentStatus;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.data.repository.PaymentRepository;
@@ -52,6 +53,10 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (!currentUser.hasRole("ADMIN") && !booking.getUser().getId().equals(currentUser.getId())) {
             throw new ForbiddenOperationException("Access denied");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new IllegalArgumentException("Cannot create payment for a cancelled booking");
         }
 
         paymentRepository.findByBooking_Id(booking.getId()).ifPresent(existing -> {

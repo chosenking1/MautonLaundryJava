@@ -2,6 +2,7 @@ package com.work.mautonlaundry.config;
 
 import com.work.mautonlaundry.security.service.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
 
@@ -28,9 +30,17 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             return message;
         }
 
-        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+        StompCommand command = accessor.getCommand();
+        if (command != null) {
+            log.info("STOMP frame: command={} destination={} sessionId={} hasUser={}",
+                    command, accessor.getDestination(), accessor.getSessionId(),
+                    accessor.getUser() != null);
+        }
+
+        if (StompCommand.CONNECT.equals(command)) {
             String token = resolveToken(accessor);
             if (!StringUtils.hasText(token) || !jwtTokenProvider.validateToken(token)) {
+                log.warn("STOMP CONNECT rejected: missing or invalid token");
                 throw new IllegalArgumentException("Authenticated WebSocket connection required");
             }
 
@@ -42,10 +52,14 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
                     userDetails.getAuthorities()
             );
             accessor.setUser(authentication);
+            log.info("STOMP CONNECT accepted: user={} sessionId={}",
+                    username, accessor.getSessionId());
         }
 
-        if ((StompCommand.SEND.equals(accessor.getCommand()) || StompCommand.SUBSCRIBE.equals(accessor.getCommand()))
+        if ((StompCommand.SEND.equals(command) || StompCommand.SUBSCRIBE.equals(command))
                 && accessor.getUser() == null) {
+            log.warn("STOMP {} rejected: no user on session {} destination={}",
+                    command, accessor.getSessionId(), accessor.getDestination());
             throw new IllegalArgumentException("Authenticated WebSocket connection required");
         }
 

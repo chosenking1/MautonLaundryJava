@@ -11,5 +11,5 @@ import java.util.Optional;
 @Repository
 public interface DiscountRepository extends JpaRepository<Discount, String> {
     Optional<Discount> findByCodeIgnoreCase(String code);
-    Optional<Discount> findByCodeIgnoreCaseAndIsActiveTrue(String code);
+    Optional<Discount> findByCodeIgnoreCaseAndActiveTrue(String code);
 }

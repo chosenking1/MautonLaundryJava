@@ -44,8 +44,7 @@ public enum DeliveryAssignmentStatus {
                 ARRIVED_AT_LAUNDRY,
                 PICKED_UP_FROM_LAUNDRY,
                 ENROUTE_FROM_LAUNDRY_TO_CUSTOMER,
-                ARRIVED_AT_CUSTOMER_FOR_DELIVERY,
-                DELIVERED_TO_CUSTOMER
+                ARRIVED_AT_CUSTOMER_FOR_DELIVERY
         );
     }
 }

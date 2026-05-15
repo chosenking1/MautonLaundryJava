@@ -80,9 +80,9 @@ public class Discount {
 
     private LocalDateTime validUntil;
 
-    @Column(nullable = false)
+    @Column(name = "is_active", nullable = false)
     @Builder.Default
-    private boolean isActive = true;
+    private boolean active = true;
 
     @Column(nullable = false, updatable = false)
     @Builder.Default
@@ -96,8 +96,33 @@ public class Discount {
 
     @PrePersist
     public void prePersist() {
+        LocalDateTime now = LocalDateTime.now();
         if (this.id == null) {
             this.id = java.util.UUID.randomUUID().toString();
+        }
+        if (this.createdAt == null) {
+            this.createdAt = now;
+        }
+        if (this.updatedAt == null) {
+            this.updatedAt = now;
+        }
+        if (this.validFrom == null) {
+            this.validFrom = now;
+        }
+        if (this.ownerType == null) {
+            this.ownerType = OwnerType.IMOTOTO;
+        }
+        if (this.discountType == null) {
+            this.discountType = DiscountType.PERCENTAGE;
+        }
+        if (this.resetPeriod == null) {
+            this.resetPeriod = ResetPeriod.MONTHLY;
+        }
+        if (this.maxUsesPerUser == null) {
+            this.maxUsesPerUser = 2;
+        }
+        if (this.currentTotalUses == null) {
+            this.currentTotalUses = 0;
         }
     }
 

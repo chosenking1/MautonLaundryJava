@@ -3,6 +3,7 @@ package com.work.mautonlaundry.services.payments;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.Payment;
+import com.work.mautonlaundry.data.model.enums.BookingStatus;
 import com.work.mautonlaundry.data.model.enums.PaymentStatus;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.data.repository.PaymentRepository;
@@ -18,6 +19,7 @@ import com.work.mautonlaundry.payments.gateway.PaymentGatewayAdapter;
 import com.work.mautonlaundry.payments.gateway.model.GatewayInitiationResult;
 import com.work.mautonlaundry.payments.gateway.model.GatewayWebhookEvent;
 import com.work.mautonlaundry.security.util.SecurityUtil;
+import com.work.mautonlaundry.services.BookingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class PaymentGatewayService {
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
     private final PaymentGatewayRouter gatewayRouter;
+    private final BookingService bookingService;
 
     private BigDecimal resolvePayableAmount(Booking booking, BigDecimal fallbackAmount) {
         BigDecimal amount = booking.getFinalAmount();
@@ -54,6 +57,10 @@ public class PaymentGatewayService {
 
         if (!currentUser.hasRole("ADMIN") && !booking.getUser().getId().equals(currentUser.getId())) {
             throw new ForbiddenOperationException("Access denied");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new IllegalArgumentException("Cannot initiate payment for a cancelled booking");
         }
 
         PaymentGatewayAdapter adapter = gatewayRouter.resolve(request.getProvider());
@@ -111,6 +118,13 @@ public class PaymentGatewayService {
         payment.setLastWebhookEventId(event.getEventId());
         payment.setGatewayPayload(event.getRawPayload());
         paymentRepository.save(payment);
+
+        // If the payment just cleared and the laundry has already marked the
+        // order done, release the booking from its WASHING hold so a return-
+        // dispatch can be enqueued.
+        if (event.getStatus() == PaymentStatus.COMPLETED && payment.getBooking() != null) {
+            bookingService.resumeAfterPaymentIfReady(payment.getBooking().getId());
+        }
     }
 
     @Transactional(readOnly = true)

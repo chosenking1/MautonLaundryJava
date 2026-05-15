@@ -21,6 +21,7 @@ import com.work.mautonlaundry.dtos.responses.deliveryresponse.AcceptDeliveryJobR
 import com.work.mautonlaundry.dtos.responses.deliveryresponse.DeliveryAssignmentSummaryResponse;
 import com.work.mautonlaundry.dtos.responses.deliveryresponse.DeliveryNextStop;
 import com.work.mautonlaundry.dtos.responses.deliveryresponse.DeliveryStatusUpdateResponse;
+import com.work.mautonlaundry.exceptions.ConflictException;
 import com.work.mautonlaundry.exceptions.ForbiddenOperationException;
 import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
@@ -59,6 +60,7 @@ public class DeliveryService {
     private final NotificationService notificationService;
     private final MetricsService metricsService;
     private final BookingService bookingService;
+    private final HandoffCodeService handoffCodeService;
 
     @Transactional
     public AcceptDeliveryJobResponse acceptDeliveryJob(AcceptDeliveryJobRequest request) {
@@ -125,6 +127,16 @@ public class DeliveryService {
         );
         notificationService.notifyDriverAssigned(booking.getUser().getEmail(), booking.getId());
 
+        // Issue the first handoff code for this phase. Stage 1 (customer→rider
+        // pickup) goes to the customer; stage 4 (laundry→rider return) goes to
+        // the laundry agent. The next-stage code is issued automatically when
+        // this one is redeemed.
+        com.work.mautonlaundry.data.model.enums.HandoffStage stageToIssue =
+                phase == DeliveryAssignmentPhase.PICKUP_FROM_CUSTOMER
+                        ? com.work.mautonlaundry.data.model.enums.HandoffStage.CUSTOMER_TO_RIDER_PICKUP
+                        : com.work.mautonlaundry.data.model.enums.HandoffStage.LAUNDRY_TO_RIDER_RETURN;
+        handoffCodeService.issueCode(booking, stageToIssue);
+
         redisTemplate.opsForValue().set(idempotencyKey, agent.getId(), Duration.ofHours(1));
         metricsService.incrementJobsAccepted();
         recordDispatchLatency(booking.getId());
@@ -161,6 +173,20 @@ public class DeliveryService {
             assignment.setStatus(nextAssignmentStatus);
             assignment.setRespondedAt(LocalDateTime.now());
             deliveryAssignmentRepository.save(assignment);
+        }
+
+        // Terminal leg reached — mark the assignment COMPLETED so it drops out
+        // of the agent's Active list and into Completed. Pickup phase ends at
+        // DELIVERED_TO_LAUNDRY; return phase ends at DELIVERED_TO_CUSTOMER.
+        boolean isTerminal = (phase == DeliveryAssignmentPhase.PICKUP_FROM_CUSTOMER
+                    && nextAssignmentStatus == DeliveryAssignmentStatus.DELIVERED_TO_LAUNDRY)
+                || (phase == DeliveryAssignmentPhase.RETURN_TO_CUSTOMER
+                    && nextAssignmentStatus == DeliveryAssignmentStatus.DELIVERED_TO_CUSTOMER);
+        if (isTerminal && assignment.getStatus() != DeliveryAssignmentStatus.COMPLETED) {
+            assignment.setStatus(DeliveryAssignmentStatus.COMPLETED);
+            assignment.setRespondedAt(LocalDateTime.now());
+            deliveryAssignmentRepository.save(assignment);
+            nextAssignmentStatus = DeliveryAssignmentStatus.COMPLETED;
         }
 
         BookingStatus targetBookingStatus = mapBookingStatus(phase, normalizedStatus);
@@ -305,6 +331,20 @@ public class DeliveryService {
                 || currentStatus == DeliveryAssignmentStatus.DECLINED
                 || currentStatus == DeliveryAssignmentStatus.COMPLETED) {
             throw new IllegalArgumentException("Delivery assignment is not active");
+        }
+
+        // The four route statuses below correspond to the four physical handoffs
+        // and can ONLY be advanced via the /handoff/redeem endpoint with a valid
+        // one-time code. Reject the legacy "next step" path here so a rider
+        // cannot bypass the customer/laundry confirmation.
+        boolean isHandoffGated =
+                requestedStatus == DeliveryRouteStatus.PICKED_UP
+                        || (phase == DeliveryAssignmentPhase.PICKUP_FROM_CUSTOMER
+                                && requestedStatus == DeliveryRouteStatus.ARRIVED_AT_LAUNDRY)
+                        || (phase == DeliveryAssignmentPhase.RETURN_TO_CUSTOMER
+                                && requestedStatus == DeliveryRouteStatus.DELIVERED_TO_CUSTOMER);
+        if (isHandoffGated) {
+            throw new ConflictException("This step requires a handoff code from the customer or laundry");
         }
 
         List<DeliveryRouteStatus> sequence = routeSequence(phase);
@@ -535,12 +575,18 @@ public class DeliveryService {
     private Address resolveLaundryAddress(Booking booking) {
         Optional<AppUser> laundryAgent = findLaundryAgent(booking);
         if (laundryAgent.isEmpty()) {
-            return booking.getPickupAddress();
+            log.warn("No accepted laundry agent for booking {} — laundry destination unavailable",
+                    booking.getId());
+            return null;
         }
         return addressRepository.findByUserAndDeletedFalse(laundryAgent.get()).stream()
                 .filter(addr -> addr.getLatitude() != null && addr.getLongitude() != null)
                 .findFirst()
-                .orElse(booking.getPickupAddress());
+                .orElseGet(() -> {
+                    log.warn("Laundry agent {} has no address with coordinates for booking {}",
+                            laundryAgent.get().getId(), booking.getId());
+                    return null;
+                });
     }
 
     private String formatAddressLine(Address address) {

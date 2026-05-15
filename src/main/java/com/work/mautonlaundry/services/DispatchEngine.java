@@ -10,10 +10,12 @@ import com.work.mautonlaundry.data.model.enums.BookingStatus;
 import com.work.mautonlaundry.data.model.enums.DeliveryAssignmentPhase;
 import com.work.mautonlaundry.data.model.enums.DeliveryAssignmentStatus;
 import com.work.mautonlaundry.data.model.enums.LaundrymanAssignmentStatus;
+import com.work.mautonlaundry.data.model.Role;
 import com.work.mautonlaundry.data.repository.AddressRepository;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.data.repository.DeliveryAssignmentRepository;
 import com.work.mautonlaundry.data.repository.LaundrymanAssignmentRepository;
+import com.work.mautonlaundry.data.repository.RoleRepository;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.dtos.responses.deliveryresponse.AvailableDeliveryJobResponse;
 import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
@@ -34,6 +36,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -47,7 +52,6 @@ public class DispatchEngine {
     private static final String DELIVERY_JOB_KEY = "delivery:job:%s";
     private static final String DELIVERY_AGENTS_GEO_KEY = "delivery_agents_geo";
     private static final String AGENT_ONLINE_KEY = "agent:online:%s";
-    private static final double[] RADIUS_STAGES_KM = {2.0, 5.0, 10.0, 15.0};
     private static final long STAGE_WAIT_SECONDS = 30;
 
     private final StringRedisTemplate redisTemplate;
@@ -57,6 +61,7 @@ public class DispatchEngine {
     private final AddressRepository addressRepository;
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final NotificationService notificationService;
     private final MetricsService metricsService;
     private final GeoLocationService geoLocationService;
@@ -71,10 +76,44 @@ public class DispatchEngine {
     @Value("${app.dispatch.retry-delay-seconds:120}")
     private long dispatchRetryDelaySeconds;
 
+    @Value("${app.dispatch.operating-hours.start:08:00}")
+    private String operatingHoursStart;
+
+    @Value("${app.dispatch.operating-hours.end:20:00}")
+    private String operatingHoursEnd;
+
+    @Value("${app.dispatch.operating-hours.timezone:Africa/Lagos}")
+    private String operatingHoursTimezone;
+
+    @Value("${app.dispatch.radius-stages-km:2,5,10,15}")
+    private String radiusStagesConfig;
+
+    @Value("${app.dispatch.fallback-any-online:true}")
+    private boolean fallbackAnyOnline;
+
+    private double[] radiusStagesKm;
+
+    private double[] getRadiusStagesKm() {
+        if (radiusStagesKm != null) return radiusStagesKm;
+        try {
+            String[] parts = radiusStagesConfig.split(",");
+            double[] parsed = new double[parts.length];
+            for (int i = 0; i < parts.length; i++) {
+                parsed[i] = Double.parseDouble(parts[i].trim());
+            }
+            radiusStagesKm = parsed;
+        } catch (NumberFormatException ex) {
+            log.warn("Invalid app.dispatch.radius-stages-km '{}' — falling back to defaults", radiusStagesConfig);
+            radiusStagesKm = new double[]{2.0, 5.0, 10.0, 15.0};
+        }
+        return radiusStagesKm;
+    }
+
     public void enqueueDispatchJob(Booking booking, DeliveryAssignmentPhase phase) {
         Address origin = resolveOriginAddress(booking, phase);
         if (origin == null || origin.getLatitude() == null || origin.getLongitude() == null) {
-            log.warn("Cannot enqueue dispatch job: missing coordinates for booking {}", booking.getId());
+            log.warn("Cannot enqueue dispatch job: missing coordinates for booking {} phase {}",
+                    booking.getId(), phase);
             return;
         }
         DispatchJob job = new DispatchJob(
@@ -88,6 +127,8 @@ public class DispatchEngine {
         );
         pushJob(job);
         metricsService.incrementJobsCreated();
+        log.info("Dispatch job enqueued: bookingId={} phase={} origin=({},{})",
+                booking.getId(), phase, origin.getLatitude(), origin.getLongitude());
     }
 
     @Transactional
@@ -110,6 +151,13 @@ public class DispatchEngine {
             return;
         }
 
+        boolean withinHours = isWithinOperatingHours();
+        long nextOpening = withinHours ? -1L : nextOpeningEpochSeconds();
+        if (!withinHours) {
+            log.info("Outside operating hours ({}–{} {}); deferring {} pending dispatch jobs",
+                    operatingHoursStart, operatingHoursEnd, operatingHoursTimezone, size);
+        }
+
         for (int i = 0; i < size; i++) {
             String raw = redisTemplate.opsForList().rightPop(DELIVERY_JOBS_KEY);
             if (raw == null) {
@@ -124,25 +172,47 @@ public class DispatchEngine {
                 continue;
             }
 
+            if (!withinHours) {
+                // Reset createdAt to next opening so the TTL window does not
+                // burn down overnight while jobs are frozen.
+                DispatchJob deferred = new DispatchJob(
+                        job.bookingId(),
+                        job.phase(),
+                        job.pickupLat(),
+                        job.pickupLng(),
+                        job.radiusIndex(),
+                        nextOpening,
+                        nextOpening
+                );
+                pushJob(deferred);
+                continue;
+            }
+
             long now = Instant.now().getEpochSecond();
             if (now - job.createdAt() > jobTtlSeconds) {
-                metricsService.incrementJobsExpired();
-                log.info("Dispatch job expired for booking {} phase {} (age={}s)",
-                        job.bookingId(), job.phase(), now - job.createdAt());
-                if (shouldRetry(job)) {
-                    DispatchJob retryJob = new DispatchJob(
-                            job.bookingId(),
-                            job.phase(),
-                            job.pickupLat(),
-                            job.pickupLng(),
-                            0,
-                            now + dispatchRetryDelaySeconds,
-                            now
-                    );
-                    pushJob(retryJob);
-                } else {
+                // The booking-side check is authoritative: dispatch only stops when
+                // the booking is gone, cancelled, or completed (an accepted offer is
+                // already filtered out above by isJobAlreadyAssigned). Otherwise,
+                // reset the radius walk and the TTL clock and keep trying.
+                if (isBookingTerminal(job.bookingId())) {
+                    metricsService.incrementJobsExpired();
+                    log.info("Dispatch job stopped for booking {} phase {} — booking inactive",
+                            job.bookingId(), job.phase());
                     redisTemplate.delete(DELIVERY_JOB_KEY.formatted(job.bookingId()));
+                    continue;
                 }
+                log.info("Dispatch TTL hit for booking {} phase {} — restarting radius walk",
+                        job.bookingId(), job.phase());
+                DispatchJob retryJob = new DispatchJob(
+                        job.bookingId(),
+                        job.phase(),
+                        job.pickupLat(),
+                        job.pickupLng(),
+                        0,
+                        now + dispatchRetryDelaySeconds,
+                        now
+                );
+                pushJob(retryJob);
                 continue;
             }
             if (job.nextAttemptAt() > now) {
@@ -150,10 +220,21 @@ public class DispatchEngine {
                 continue;
             }
 
-            double radiusKm = RADIUS_STAGES_KM[Math.min(job.radiusIndex(), RADIUS_STAGES_KM.length - 1)];
-            findAndNotifyAgents(job, radiusKm);
+            double[] stages = getRadiusStagesKm();
+            int currentIndex = Math.min(job.radiusIndex(), stages.length - 1);
+            double radiusKm = stages[currentIndex];
+            int notified = findAndNotifyAgents(job, radiusKm);
 
-            int nextRadiusIndex = Math.min(job.radiusIndex() + 1, RADIUS_STAGES_KM.length - 1);
+            // If we've already walked to the largest ring and still notified
+            // nobody, low-density agent setups (e.g. one rider for the whole
+            // city) will never reach anyone via geo. Fall back to "any online
+            // delivery agent" once per radius pass so the offer at least lands.
+            boolean atFinalRing = currentIndex >= stages.length - 1;
+            if (atFinalRing && notified == 0 && fallbackAnyOnline) {
+                fallbackNotifyAnyOnlineAgent(job, radiusKm);
+            }
+
+            int nextRadiusIndex = Math.min(job.radiusIndex() + 1, stages.length - 1);
             DispatchJob nextJob = new DispatchJob(
                     job.bookingId(),
                     job.phase(),
@@ -167,16 +248,22 @@ public class DispatchEngine {
         }
     }
 
-    private void findAndNotifyAgents(DispatchJob job, double radiusKm) {
+    private int findAndNotifyAgents(DispatchJob job, double radiusKm) {
         Circle search = new Circle(new Point(job.pickupLng(), job.pickupLat()), new Distance(radiusKm, Metrics.KILOMETERS));
         var results = redisTemplate.opsForGeo().radius(DELIVERY_AGENTS_GEO_KEY, search);
+        int candidateCount = results == null ? 0 : results.getContent().size();
+        log.info("Dispatch radius search: bookingId={} phase={} radiusKm={} candidatesInRadius={}",
+                job.bookingId(), job.phase(), radiusKm, candidateCount);
         if (results == null || results.getContent().isEmpty()) {
-            return;
+            return 0;
         }
 
+        int notified = 0;
+        int skippedOffline = 0;
         for (var geo : results.getContent()) {
             String agentId = geo.getContent().getName();
             if (!isAgentOnline(agentId)) {
+                skippedOffline++;
                 continue;
             }
             Optional<AppUser> agent = userRepository.findUserById(agentId);
@@ -213,6 +300,61 @@ public class DispatchEngine {
                     job.phase().name(),
                     radiusKm
             );
+            notified++;
+        }
+        if (notified == 0) {
+            log.warn("Dispatch found {} candidate(s) but notified 0: bookingId={} phase={} radiusKm={} skippedOffline={}",
+                    candidateCount, job.bookingId(), job.phase(), radiusKm, skippedOffline);
+        } else {
+            log.info("Dispatch notified {} agent(s): bookingId={} phase={} radiusKm={}",
+                    notified, job.bookingId(), job.phase(), radiusKm);
+        }
+        return notified;
+    }
+
+    /**
+     * Last-ditch fallback when geo radius walk has exhausted its largest ring
+     * with zero notifications. Scans every online delivery agent (regardless
+     * of distance) and offers the job to each. Keeps low-density single-agent
+     * setups working in cities where the agent is routinely outside the
+     * largest ring.
+     */
+    private void fallbackNotifyAnyOnlineAgent(DispatchJob job, double radiusKm) {
+        Optional<Role> deliveryRole = roleRepository.findByName("DELIVERY_AGENT");
+        if (deliveryRole.isEmpty()) {
+            log.warn("Dispatch fallback skipped: DELIVERY_AGENT role not configured");
+            return;
+        }
+        List<AppUser> agents = userRepository.findByRoleAndDeletedFalse(deliveryRole.get());
+        int notified = 0;
+        for (AppUser agent : agents) {
+            if (!isAgentOnline(agent.getId())) continue;
+
+            AvailableDeliveryJobResponse payload = AvailableDeliveryJobResponse.builder()
+                    .bookingId(job.bookingId())
+                    .phase(job.phase())
+                    .pickupLat(job.pickupLat())
+                    .pickupLng(job.pickupLng())
+                    .distanceKm(-1.0)
+                    .radiusKm(radiusKm)
+                    .createdAt(job.createdAt())
+                    .build();
+
+            messagingTemplate.convertAndSend("/topic/agent/" + agent.getId() + "/offer", payload);
+            notificationService.notifyDeliveryOffer(
+                    agent.getEmail(),
+                    job.bookingId(),
+                    job.phase().name(),
+                    radiusKm
+            );
+            notified++;
+        }
+        if (notified > 0) {
+            log.info("Dispatch fallback notified {} online agent(s): bookingId={} phase={}",
+                    notified, job.bookingId(), job.phase());
+        } else {
+            log.warn("Dispatch fallback found no online agents at all: bookingId={} phase={}",
+                    job.bookingId(), job.phase());
         }
     }
 
@@ -244,7 +386,8 @@ public class DispatchEngine {
             if (now - job.createdAt() > jobTtlSeconds) {
                 continue;
             }
-            double radiusKm = RADIUS_STAGES_KM[Math.min(job.radiusIndex(), RADIUS_STAGES_KM.length - 1)];
+            double[] stages = getRadiusStagesKm();
+            double radiusKm = stages[Math.min(job.radiusIndex(), stages.length - 1)];
             double distanceKm = geoLocationService.calculateDistance(
                     agentPoint.getY(),
                     agentPoint.getX(),
@@ -322,16 +465,13 @@ public class DispatchEngine {
                 .orElse(booking.getPickupAddress());
     }
 
-    private boolean shouldRetry(DispatchJob job) {
-        Optional<Booking> bookingOpt = bookingRepository.findByIdAndDeletedFalse(job.bookingId());
+    private boolean isBookingTerminal(String bookingId) {
+        Optional<Booking> bookingOpt = bookingRepository.findByIdAndDeletedFalse(bookingId);
         if (bookingOpt.isEmpty()) {
-            return false;
+            return true;
         }
-        Booking booking = bookingOpt.get();
-        if (job.phase() == DeliveryAssignmentPhase.PICKUP_FROM_CUSTOMER) {
-            return booking.getStatus() == BookingStatus.PICKUP_DISPATCH_PENDING;
-        }
-        return booking.getStatus() == BookingStatus.DELIVERY_DISPATCH_PENDING;
+        BookingStatus status = bookingOpt.get().getStatus();
+        return status == BookingStatus.CANCELLED || status == BookingStatus.COMPLETED;
     }
 
     private DeliveryAssignmentPhase resolvePhaseFromStatus(BookingStatus status) {
@@ -361,5 +501,26 @@ public class DispatchEngine {
             log.warn("Failed to parse dispatch job: {}", ex.getMessage());
             return null;
         }
+    }
+
+    private boolean isWithinOperatingHours() {
+        ZoneId zone = ZoneId.of(operatingHoursTimezone);
+        LocalTime now = LocalTime.now(zone);
+        LocalTime start = LocalTime.parse(operatingHoursStart);
+        LocalTime end = LocalTime.parse(operatingHoursEnd);
+        if (start.isBefore(end)) {
+            return !now.isBefore(start) && now.isBefore(end);
+        }
+        // Overnight window (e.g., 22:00–06:00).
+        return !now.isBefore(start) || now.isBefore(end);
+    }
+
+    private long nextOpeningEpochSeconds() {
+        ZoneId zone = ZoneId.of(operatingHoursTimezone);
+        LocalTime start = LocalTime.parse(operatingHoursStart);
+        ZonedDateTime now = ZonedDateTime.now(zone);
+        ZonedDateTime todayStart = now.with(start);
+        ZonedDateTime opening = now.isBefore(todayStart) ? todayStart : todayStart.plusDays(1);
+        return opening.toEpochSecond();
     }
 }

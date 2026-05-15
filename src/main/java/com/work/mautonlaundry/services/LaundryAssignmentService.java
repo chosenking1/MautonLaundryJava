@@ -43,6 +43,7 @@ public class LaundryAssignmentService {
     private final NotificationService notificationService;
     private final BookingStateMachine bookingStateMachine;
     private final DispatchEngine dispatchEngine;
+    private final LaundryAgentHoursService laundryAgentHoursService;
 
     @Value("${app.assignment.laundry.offer-batch-size:3}")
     private int offerBatchSize;
@@ -76,14 +77,43 @@ public class LaundryAssignmentService {
 
         List<AppUser> laundryAgents = userRepository.findByRoleAndDeletedFalse(laundryRole);
         int batchSize = offerBatchSize > 0 ? offerBatchSize : DEFAULT_OFFER_BATCH_SIZE;
-        List<AppUser> nearest = laundryAgents.stream()
-                .filter(agent -> Boolean.TRUE.equals(agent.getOnline()))
+        // Per-agent operating hours — skip agents who are closed right now.
+        // An agent with no rows configured is treated as always open, so
+        // single-agent setups without explicit hours keep working.
+        java.time.Instant now = java.time.Instant.now();
+        List<AppUser> openAgents = laundryAgents.stream()
+                .filter(a -> laundryAgentHoursService.isOpenAt(a.getId(), now))
+                .toList();
+        if (openAgents.size() < laundryAgents.size()) {
+            log.info("Filtered laundry agents by operating hours: {} of {} open at {} for booking {}",
+                    openAgents.size(), laundryAgents.size(), now, booking.getId());
+        }
+        // Laundry agents are physical shops, not roaming riders — they should
+        // receive offers regardless of the `online` presence flag. They can
+        // still accept/reject manually; the existing 60-minute auto-accept
+        // (autoAcceptExpiredOffer) is the fallback when nobody acts.
+        List<AppUser> nearest = openAgents.stream()
                 .map(agent -> toLaundryCandidate(agent, pickupAddress))
                 .flatMap(Optional::stream)
                 .sorted(Comparator.comparingDouble(CandidateLaundry::distanceKm))
                 .limit(batchSize)
                 .map(CandidateLaundry::agent)
                 .toList();
+
+        // If nobody has address coordinates we'd otherwise leave the booking
+        // stuck at LAUNDRY_ASSIGNMENT_PENDING forever. Better to fall back to
+        // any matching laundry agent (no distance ranking) so the flow can
+        // progress, and surface a WARN so the missing data gets backfilled.
+        if (nearest.isEmpty() && !openAgents.isEmpty()) {
+            log.warn("No open laundry agents have address coordinates for booking {} — falling back to any open agent. Backfill latitude/longitude on the laundry agent's address to restore distance-based ranking.",
+                    booking.getId());
+            nearest = openAgents.stream().limit(batchSize).toList();
+        }
+
+        if (nearest.isEmpty()) {
+            log.warn("No laundry agents available for booking {}", booking.getId());
+            return;
+        }
 
         for (AppUser agent : nearest) {
             LaundrymanAssignment assignment = new LaundrymanAssignment();

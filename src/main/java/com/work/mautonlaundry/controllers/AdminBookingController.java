@@ -1,9 +1,19 @@
 package com.work.mautonlaundry.controllers;
 
+import com.work.mautonlaundry.data.model.Booking;
+import com.work.mautonlaundry.data.model.HandoffCode;
 import com.work.mautonlaundry.data.model.enums.BookingStatus;
-import com.work.mautonlaundry.dtos.responses.common.MessageResponse;
+import com.work.mautonlaundry.data.model.enums.HandoffStage;
+import com.work.mautonlaundry.data.repository.BookingRepository;
+import com.work.mautonlaundry.dtos.requests.handoffrequests.RegenerateHandoffCodeRequest;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingDetailsResponse;
+import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingTimelineEntryResponse;
+import com.work.mautonlaundry.dtos.responses.common.MessageResponse;
+import com.work.mautonlaundry.dtos.responses.handoffresponses.HandoffCodeView;
+import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
 import com.work.mautonlaundry.services.BookingService;
+import com.work.mautonlaundry.services.HandoffCodeService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -12,6 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/admin/bookings")
 @RequiredArgsConstructor
@@ -19,6 +31,8 @@ import org.springframework.web.bind.annotation.*;
 public class AdminBookingController {
 
     private final BookingService bookingService;
+    private final HandoffCodeService handoffCodeService;
+    private final BookingRepository bookingRepository;
 
     @GetMapping
     public ResponseEntity<Page<BookingDetailsResponse>> getAllBookings(
@@ -58,5 +72,31 @@ public class AdminBookingController {
             @PathVariable String laundryAgentId) {
         bookingService.assignLaundryAgentByAdmin(bookingId, laundryAgentId);
         return ResponseEntity.ok(new MessageResponse("Laundry agent force-reassigned and TTL restarted"));
+    }
+
+    @PostMapping("/{bookingId}/codes/regenerate")
+    public ResponseEntity<HandoffCodeView> regenerateHandoffCode(
+            @PathVariable String bookingId,
+            @Valid @RequestBody RegenerateHandoffCodeRequest request) {
+        HandoffStage stage;
+        try {
+            stage = HandoffStage.valueOf(request.getStage().trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid handoff stage: " + request.getStage());
+        }
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
+        HandoffCode reissued = handoffCodeService.regenerate(booking, stage);
+        return ResponseEntity.ok(HandoffCodeView.builder()
+                .stage(reissued.getStage().name())
+                .code(reissued.getCode())
+                .issuedAt(reissued.getIssuedAt())
+                .expiresAt(reissued.getExpiresAt())
+                .build());
+    }
+
+    @GetMapping("/{bookingId}/timeline")
+    public ResponseEntity<List<BookingTimelineEntryResponse>> getTimeline(@PathVariable String bookingId) {
+        return ResponseEntity.ok(bookingService.getStatusTimeline(bookingId));
     }
 }

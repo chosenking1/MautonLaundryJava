@@ -89,6 +89,9 @@ public class Booking {
     @Column(name = "customer_early_delivery_decision_at")
     private LocalDateTime customerEarlyDeliveryDecisionAt;
 
+    @Column(name = "laundry_marked_done_at")
+    private LocalDateTime laundryMarkedDoneAt;
+
     @Column(nullable = false)
     private Boolean deleted = false;
 

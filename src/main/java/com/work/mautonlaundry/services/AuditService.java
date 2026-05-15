@@ -5,26 +5,35 @@ import com.work.mautonlaundry.data.model.AuditLog;
 import com.work.mautonlaundry.data.repository.AuditLogRepository;
 import com.work.mautonlaundry.security.util.SecurityUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+@Slf4j
 @Service
 public class AuditService {
-    
+
     @Autowired
     private AuditLogRepository auditLogRepository;
-    
-    @Async
+
     public void logAction(String action, String resource, String resourceId, String details) {
+        AppUser currentUser = SecurityUtil.getCurrentUser().orElse(null);
+        if (currentUser == null) {
+            log.debug("Skipping audit log for {} {} - no authenticated user", action, resource);
+            return;
+        }
+
+        String ipAddress = null;
+        String userAgent = null;
+        HttpServletRequest request = getCurrentRequest();
+        if (request != null) {
+            ipAddress = getClientIpAddress(request);
+            userAgent = request.getHeader("User-Agent");
+        }
+
         try {
-            AppUser currentUser = SecurityUtil.getCurrentUser().orElse(null);
-            if (currentUser == null) return;
-            
-            HttpServletRequest request = getCurrentRequest();
-            
             AuditLog auditLog = new AuditLog();
             auditLog.setUserId(currentUser.getId());
             auditLog.setUserEmail(currentUser.getEmail());
@@ -32,28 +41,22 @@ public class AuditService {
             auditLog.setResource(resource);
             auditLog.setResourceId(resourceId);
             auditLog.setDetails(details);
-            
-            if (request != null) {
-                auditLog.setIpAddress(getClientIpAddress(request));
-                auditLog.setUserAgent(request.getHeader("User-Agent"));
-            }
-            
+            auditLog.setIpAddress(ipAddress);
+            auditLog.setUserAgent(userAgent);
             auditLogRepository.save(auditLog);
         } catch (Exception e) {
-            // Log error but don't fail the main operation
+            log.warn("Failed to persist audit log for action {} resource {}: {}", action, resource, e.getMessage());
         }
     }
-    
-    @Async
+
     public void logAction(String action, String resource, String resourceId) {
         logAction(action, resource, resourceId, null);
     }
-    
-    @Async
+
     public void logAction(String action, String resource) {
         logAction(action, resource, null, null);
     }
-    
+
     private HttpServletRequest getCurrentRequest() {
         try {
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
@@ -62,7 +65,7 @@ public class AuditService {
             return null;
         }
     }
-    
+
     private String getClientIpAddress(HttpServletRequest request) {
         String xForwardedForHeader = request.getHeader("X-Forwarded-For");
         if (xForwardedForHeader == null) {

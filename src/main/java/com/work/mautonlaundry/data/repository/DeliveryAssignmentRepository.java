@@ -19,6 +19,8 @@ public interface DeliveryAssignmentRepository extends JpaRepository<DeliveryAssi
     List<DeliveryAssignment> findByBookingAndPhaseAndStatus(Booking booking, DeliveryAssignmentPhase phase, DeliveryAssignmentStatus status);
     Optional<DeliveryAssignment> findByBookingAndPhaseAndDeliveryAgent(Booking booking, DeliveryAssignmentPhase phase, AppUser deliveryAgent);
     Optional<DeliveryAssignment> findByBookingAndDeliveryAgent(Booking booking, AppUser deliveryAgent);
+    List<DeliveryAssignment> findByBookingAndDeliveryAgentAndStatusIn(
+            Booking booking, AppUser deliveryAgent, List<DeliveryAssignmentStatus> statuses);
     long countByDeliveryAgentAndStatusIn(AppUser deliveryAgent, List<DeliveryAssignmentStatus> statuses);
     
     Optional<DeliveryAssignment> findTopByBookingAndStatusInOrderByCreatedAtDesc(Booking booking, List<DeliveryAssignmentStatus> statuses);

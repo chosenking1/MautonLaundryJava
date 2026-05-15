@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -15,4 +16,6 @@ public interface DiscountUserAssignmentRepository extends JpaRepository<Discount
     Page<DiscountUserAssignment> findByDiscountId(String discountId, Pageable pageable);
     Page<DiscountUserAssignment> findByDiscountIdAndApprovalStatus(String discountId, ApprovalStatus status, Pageable pageable);
     Page<DiscountUserAssignment> findByApprovalStatus(ApprovalStatus status, Pageable pageable);
+    List<DiscountUserAssignment> findByUserId(String userId);
+    List<DiscountUserAssignment> findByUserIdAndApprovalStatus(String userId, ApprovalStatus status);
 }

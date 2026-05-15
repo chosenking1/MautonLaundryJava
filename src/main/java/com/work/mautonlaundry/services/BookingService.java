@@ -3,19 +3,28 @@ package com.work.mautonlaundry.services;
 import com.work.mautonlaundry.data.model.*;
 import com.work.mautonlaundry.data.model.enums.BookingStatus;
 import com.work.mautonlaundry.data.model.enums.BookingType;
+import com.work.mautonlaundry.data.model.enums.DeliveryAssignmentPhase;
+import com.work.mautonlaundry.data.model.enums.DeliveryAssignmentStatus;
+import com.work.mautonlaundry.data.model.enums.HandoffCodeStatus;
+import com.work.mautonlaundry.data.model.enums.HandoffStage;
+import com.work.mautonlaundry.data.model.enums.LaundrymanAssignmentStatus;
+import com.work.mautonlaundry.data.model.enums.PaymentStatus;
 import com.work.mautonlaundry.data.repository.*;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.BookingEstimateRequest;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.BookingItemRequest;
 import com.work.mautonlaundry.dtos.requests.bookingrequests.CreateBookingRequest;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingDetailsResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingEstimateResponse;
+import com.work.mautonlaundry.dtos.responses.bookingresponse.BookingTimelineEntryResponse;
 import com.work.mautonlaundry.dtos.responses.bookingresponse.CreateBookingResponse;
+import com.work.mautonlaundry.dtos.responses.discount.DiscountApplicationResult;
 import com.work.mautonlaundry.exceptions.ForbiddenOperationException;
 import com.work.mautonlaundry.exceptions.addressexception.AddressNotFoundException;
 import com.work.mautonlaundry.exceptions.bookingexceptions.BookingNotFoundException;
 import com.work.mautonlaundry.exceptions.serviceexceptions.ServiceNotFoundException;
 import com.work.mautonlaundry.security.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -30,6 +39,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BookingService {
     
     private final BookingRepository bookingRepository;
@@ -45,6 +55,11 @@ public class BookingService {
     private final BookingStateMachine bookingStateMachine;
     private final StringRedisTemplate redisTemplate;
     private final PricingEngine pricingEngine;
+    private final DiscountService discountService;
+    private final PaymentRepository paymentRepository;
+    private final HandoffCodeRepository handoffCodeRepository;
+    private final HandoffCodeService handoffCodeService;
+    private final BookingStatusHistoryRepository bookingStatusHistoryRepository;
 
     @Transactional
     public CreateBookingResponse createBooking(CreateBookingRequest request, String idempotencyKey) {
@@ -87,6 +102,12 @@ public class BookingService {
         
         // Save everything at once
         Booking savedBooking = bookingRepository.save(booking);
+
+        // Apply discount (if any) while still inside the booking transaction so the
+        // booking's finalAmount/discountAmount are authoritative by the time the
+        // client uses the returned CreateBookingResponse to initiate payment.
+        applyDiscountIfPresent(savedBooking, request.getDiscountCode(), totalPrice, currentUser.getId());
+
         laundryAssignmentService.createLaundryOffers(savedBooking);
         savedBooking = bookingRepository.findById(savedBooking.getId()).orElse(savedBooking);
         notificationService.notifyBookingCreated(savedBooking.getUser().getEmail(), savedBooking.getId());
@@ -111,7 +132,7 @@ public class BookingService {
                 .deliveryFee(deliveryFee)
                 .expressFee(expressFee)
                 .total(total)
-                .freeDelivery(deliveryFee.compareTo(BigDecimal.ZERO) == 0)
+                .freeDelivery(pricingEngine.isFreeDeliveryTierMet(itemsTotal))
                 .build();
     }
 
@@ -177,7 +198,139 @@ public class BookingService {
         // Map items
         response.setItems(mapBookingItems(booking));
 
+        response.setActiveCodes(loadActiveCodesForCaller(booking, currentUser, isOwner, isAdmin, isLaundryAgent));
+
+        populateAssignedAgentIds(response, booking);
+
         return response;
+    }
+
+    /**
+     * Fills in laundryAgentId / pickupAgentId / returnAgentId on the response
+     * from the relevant assignment rows. Without this the admin booking detail
+     * page sees `null` for every agent ID even after assignment.
+     *
+     * Includes OFFERED rows so admin can see in-flight offers before the agent
+     * accepts ("we offered this to rider X, waiting"). DECLINED/EXPIRED/
+     * REJECTED rows are ignored — those agents never picked the job up.
+     * Picks the most recently created matching row per slot, so after a
+     * force-reassign the new agent shows up, not the previous one.
+     */
+    private void populateAssignedAgentIds(BookingDetailsResponse response, Booking booking) {
+        laundrymanAssignmentRepository
+                .findFirstByBookingAndStatusInOrderByCreatedAtDesc(
+                        booking,
+                        List.of(LaundrymanAssignmentStatus.ACCEPTED,
+                                LaundrymanAssignmentStatus.AUTO_ACCEPTED,
+                                LaundrymanAssignmentStatus.OFFERED))
+                .ifPresent(a -> response.setLaundryAgentId(a.getLaundryman().getId()));
+
+        List<DeliveryAssignmentStatus> visible = new ArrayList<>(
+                DeliveryAssignmentStatus.activeAssignmentStatuses());
+        visible.add(DeliveryAssignmentStatus.OFFERED);
+
+        List<DeliveryAssignment> deliveries =
+                deliveryAssignmentRepository.findByBookingOrderByCreatedAtDesc(booking);
+
+        deliveries.stream()
+                .filter(da -> da.getPhase() == DeliveryAssignmentPhase.PICKUP_FROM_CUSTOMER)
+                .filter(da -> visible.contains(da.getStatus()))
+                .findFirst()
+                .ifPresent(da -> response.setPickupAgentId(da.getDeliveryAgent().getId()));
+
+        deliveries.stream()
+                .filter(da -> da.getPhase() == DeliveryAssignmentPhase.RETURN_TO_CUSTOMER)
+                .filter(da -> visible.contains(da.getStatus()))
+                .findFirst()
+                .ifPresent(da -> response.setReturnAgentId(da.getDeliveryAgent().getId()));
+    }
+
+    private List<BookingDetailsResponse.ActiveCodeView> loadActiveCodesForCaller(
+            Booking booking, AppUser caller, boolean isOwner, boolean isAdmin, boolean isLaundryAgent) {
+        java.util.Set<HandoffStage> visibleStages = new java.util.HashSet<>();
+        if (isAdmin) {
+            java.util.Collections.addAll(visibleStages, HandoffStage.values());
+        } else {
+            if (isOwner) {
+                visibleStages.add(HandoffStage.CUSTOMER_TO_RIDER_PICKUP);
+                visibleStages.add(HandoffStage.RIDER_TO_CUSTOMER_DELIVERY);
+            }
+            if (isLaundryAgent) {
+                boolean isAssignedLaundryman = laundrymanAssignmentRepository.findByBooking(booking).stream()
+                        .anyMatch(a -> a.getLaundryman().getId().equals(caller.getId()));
+                if (isAssignedLaundryman) {
+                    visibleStages.add(HandoffStage.RIDER_TO_LAUNDRY);
+                    visibleStages.add(HandoffStage.LAUNDRY_TO_RIDER_RETURN);
+                }
+            }
+        }
+        if (visibleStages.isEmpty()) {
+            return java.util.List.of();
+        }
+
+        // Narrow to only the stage(s) currently in play for the booking so the
+        // customer doesn't see e.g. their pickup code AND their delivery code
+        // side-by-side mid-flow. Admin still sees everything.
+        if (!isAdmin) {
+            java.util.Set<HandoffStage> activeForStatus = stagesActiveForBookingStatus(booking.getStatus());
+            visibleStages.retainAll(activeForStatus);
+            if (visibleStages.isEmpty()) {
+                return java.util.List.of();
+            }
+        }
+
+        return visibleStages.stream()
+                .map(stage -> resolveLiveCodeForStage(booking, stage))
+                .filter(java.util.Objects::nonNull)
+                .map(code -> {
+                    BookingDetailsResponse.ActiveCodeView view = new BookingDetailsResponse.ActiveCodeView();
+                    view.setStage(code.getStage().name());
+                    view.setCode(code.getCode());
+                    view.setExpiresAt(code.getExpiresAt());
+                    return view;
+                })
+                .toList();
+    }
+
+    /**
+     * Maps a booking status to the handoff stage(s) whose codes are currently
+     * meaningful for that status. Anything outside this window — e.g. the
+     * delivery code while the booking is still at AT_LAUNDRY — should not be
+     * surfaced to non-admins; showing both at once confuses the customer and
+     * laundry agent UIs.
+     */
+    private java.util.Set<HandoffStage> stagesActiveForBookingStatus(BookingStatus status) {
+        if (status == null) return java.util.Set.of();
+        return switch (status) {
+            case PICKUP_AGENT_ASSIGNED -> java.util.Set.of(HandoffStage.CUSTOMER_TO_RIDER_PICKUP);
+            case PICKED_UP -> java.util.Set.of(HandoffStage.RIDER_TO_LAUNDRY);
+            case DELIVERY_AGENT_ASSIGNED -> java.util.Set.of(HandoffStage.LAUNDRY_TO_RIDER_RETURN);
+            case OUT_FOR_DELIVERY -> java.util.Set.of(HandoffStage.RIDER_TO_CUSTOMER_DELIVERY);
+            default -> java.util.Set.of();
+        };
+    }
+
+    /**
+     * Returns the ACTIVE handoff code for (booking, stage) or rotates a fresh
+     * one when the stored code's TTL has lapsed. Without this rotation, the
+     * customer's app would happily display a code that's already past
+     * {@code expiresAt}; the redeem endpoint would then reject it with
+     * "Invalid or expired code", confusing both sides. issueCode invalidates
+     * any prior ACTIVE code for this stage and persists a new one in the same
+     * transaction.
+     */
+    private com.work.mautonlaundry.data.model.HandoffCode resolveLiveCodeForStage(
+            Booking booking, HandoffStage stage) {
+        com.work.mautonlaundry.data.model.HandoffCode existing = handoffCodeRepository
+                .findByBookingAndStageAndStatus(booking, stage, HandoffCodeStatus.ACTIVE)
+                .orElse(null);
+        if (existing == null) return null;
+        if (java.time.Instant.now().isBefore(existing.getExpiresAt())) {
+            return existing;
+        }
+        log.info("Rotating expired handoff code on read: bookingId={} stage={} expiredAt={}",
+                booking.getId(), stage, existing.getExpiresAt());
+        return handoffCodeService.issueCode(booking, stage);
     }
 
     public Page<BookingDetailsResponse> getUserBookings(Pageable pageable) {
@@ -209,6 +362,9 @@ public class BookingService {
     }
 
     private Page<BookingDetailsResponse> mapBookingsToDetails(Page<Booking> bookings) {
+        AppUser caller = SecurityUtil.getCurrentUser().orElse(null);
+        boolean isAdmin = caller != null && caller.hasRole("ADMIN");
+        boolean isLaundryAgent = caller != null && caller.hasRole("LAUNDRY_AGENT");
         return bookings.map(booking -> {
             BookingDetailsResponse response = new BookingDetailsResponse();
             response.setId(booking.getId());
@@ -230,6 +386,18 @@ public class BookingService {
                 addressInfo.setCity(booking.getPickupAddress().getCity());
                 response.setPickupAddress(addressInfo);
             }
+
+            // Same role-filtered handoff codes the detail endpoint returns,
+            // so the laundry-agent app's list/detail views can show the code
+            // without an extra round trip per booking.
+            if (caller != null) {
+                boolean isOwner = booking.getUser() != null
+                        && booking.getUser().getId().equals(caller.getId());
+                response.setActiveCodes(loadActiveCodesForCaller(
+                        booking, caller, isOwner, isAdmin, isLaundryAgent));
+            }
+
+            populateAssignedAgentIds(response, booking);
 
             return response;
         });
@@ -344,6 +512,41 @@ public class BookingService {
         }
     }
 
+    private void applyDiscountIfPresent(Booking booking, String rawCode, BigDecimal orderValue, String userId) {
+        String code = rawCode == null ? null : rawCode.trim();
+
+        if (code != null && !code.isEmpty()) {
+            try {
+                DiscountApplicationResult result = discountService.applyDiscountAtCheckout(
+                        code, userId, booking.getId(), orderValue);
+                if (result.isApplied()) {
+                    return;
+                }
+                log.warn("Discount rejected at booking creation: code={}, userId={}, result={}",
+                        code, userId, result.getResult());
+            } catch (RuntimeException ex) {
+                // A failing discount must never prevent the booking from being created.
+                log.warn("Discount application failed during booking creation: code={}, userId={}, error={}",
+                        code, userId, ex.getMessage());
+            }
+        }
+
+        String autoCode = discountService.findActiveCorporateCodeForUser(userId);
+        if (autoCode != null) {
+            try {
+                DiscountApplicationResult result = discountService.applyDiscountAtCheckout(
+                        autoCode, userId, booking.getId(), orderValue);
+                if (!result.isApplied()) {
+                    log.info("Auto corporate discount did not apply: code={}, userId={}, result={}",
+                            autoCode, userId, result.getResult());
+                }
+            } catch (RuntimeException ex) {
+                log.warn("Auto corporate discount application failed: code={}, userId={}, error={}",
+                        autoCode, userId, ex.getMessage());
+            }
+        }
+    }
+
     private CreateBookingResponse mapCreateBookingResponse(Booking booking) {
         CreateBookingResponse response = new CreateBookingResponse();
         response.setId(booking.getId());
@@ -395,11 +598,11 @@ public class BookingService {
                 .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
 
         BookingStatus currentStatus = booking.getStatus();
-        
+        log.info("markLaundryCompleted hit: bookingId={} currentStatus={}", bookingId, currentStatus);
+
         if (currentStatus == BookingStatus.AT_LAUNDRY) {
             bookingStateMachine.validateTransition(currentStatus, BookingStatus.WASHING);
             booking.setStatus(BookingStatus.WASHING);
-            bookingRepository.save(booking);
             notificationService.notifyUserBookingStatusChange(
                     booking.getUser().getEmail(),
                     booking.getId(),
@@ -409,13 +612,52 @@ public class BookingService {
             currentStatus = BookingStatus.WASHING;
         }
 
-        bookingStateMachine.validateTransition(currentStatus, BookingStatus.READY_FOR_DELIVERY);
+        // Mark the moment the laundry agent confirmed "done washing" so the
+        // payment-completion hook can later distinguish "just started washing"
+        // from "ready to release once paid".
+        booking.setLaundryMarkedDoneAt(LocalDateTime.now());
+        bookingRepository.save(booking);
+
+        if (!isPaymentCompleted(bookingId)) {
+            log.info("markLaundryCompleted held: bookingId={} payment not COMPLETED — waiting on customer", bookingId);
+            notificationService.notifyDeliveryProgress(
+                    booking.getUser().getEmail(),
+                    booking.getId(),
+                    "Your laundry is washed and ready. Please complete payment so a rider can be dispatched."
+            );
+            return;
+        }
+
+        log.info("markLaundryCompleted releasing for return dispatch: bookingId={}", bookingId);
+        releaseForReturnDispatch(booking);
+    }
+
+    /**
+     * Called by the payment-completion path. Idempotent — only acts when the
+     * booking is in the "washed but unpaid" hold state (status=WASHING and
+     * laundry_marked_done_at is set).
+     */
+    @Transactional
+    public void resumeAfterPaymentIfReady(String bookingId) {
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId).orElse(null);
+        if (booking == null) return;
+        if (booking.getStatus() != BookingStatus.WASHING) return;
+        if (booking.getLaundryMarkedDoneAt() == null) return;
+        if (!isPaymentCompleted(bookingId)) return;
+
+        log.info("Payment cleared — releasing booking {} from WASHING hold", bookingId);
+        releaseForReturnDispatch(booking);
+    }
+
+    private void releaseForReturnDispatch(Booking booking) {
+        BookingStatus from = booking.getStatus();
+        bookingStateMachine.validateTransition(from, BookingStatus.READY_FOR_DELIVERY);
         booking.setStatus(BookingStatus.READY_FOR_DELIVERY);
         bookingRepository.save(booking);
         notificationService.notifyUserBookingStatusChange(
                 booking.getUser().getEmail(),
                 booking.getId(),
-                currentStatus.name(),
+                from.name(),
                 BookingStatus.READY_FOR_DELIVERY.name()
         );
         notificationService.notifyLaundryReady(booking.getUser().getEmail(), booking.getId());
@@ -430,6 +672,28 @@ public class BookingService {
                 BookingStatus.READY_FOR_DELIVERY.name(),
                 BookingStatus.DELIVERY_DISPATCH_PENDING.name()
         );
+    }
+
+    private boolean isPaymentCompleted(String bookingId) {
+        return paymentRepository.findByBooking_Id(bookingId)
+                .map(p -> p.getStatus() == PaymentStatus.COMPLETED)
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookingTimelineEntryResponse> getStatusTimeline(String bookingId) {
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
+        return bookingStatusHistoryRepository.findByBookingOrderByChangedAtAsc(booking).stream()
+                .map(h -> BookingTimelineEntryResponse.builder()
+                        .changedAt(h.getChangedAt())
+                        .fromStatus(h.getFromStatus() == null ? null : h.getFromStatus().name())
+                        .toStatus(h.getToStatus().name())
+                        .triggerType(h.getTriggerType().name())
+                        .actorEmail(h.getActor() == null ? null : h.getActor().getEmail())
+                        .triggerCodeStage(h.getTriggerCode() == null ? null : h.getTriggerCode().getStage().name())
+                        .build())
+                .toList();
     }
 
     @Transactional
@@ -456,9 +720,9 @@ public class BookingService {
             throw new IllegalArgumentException("Booking is already cancelled");
         }
 
-        if (booking.getStatus() == BookingStatus.PICKUP_DISPATCH_PENDING ||
-            booking.getStatus() == BookingStatus.PICKUP_AGENT_ASSIGNED ||
-            booking.getStatus() == BookingStatus.PICKED_UP ||
+        // Cancellable only while the laundry is still with the customer. Once
+        // the pickup agent has collected it, cancellation is locked.
+        if (booking.getStatus() == BookingStatus.PICKED_UP ||
             booking.getStatus() == BookingStatus.AT_LAUNDRY ||
             booking.getStatus() == BookingStatus.WASHING ||
             booking.getStatus() == BookingStatus.READY_FOR_DELIVERY ||
@@ -467,7 +731,7 @@ public class BookingService {
             booking.getStatus() == BookingStatus.OUT_FOR_DELIVERY ||
             booking.getStatus() == BookingStatus.DELIVERED ||
             booking.getStatus() == BookingStatus.COMPLETED) {
-            throw new IllegalArgumentException("Cannot cancel booking that has been picked up by delivery agent");
+            throw new IllegalArgumentException("Cannot cancel booking once the pickup agent has collected the laundry");
         }
 
         bookingStateMachine.validateTransition(booking.getStatus(), BookingStatus.CANCELLED);

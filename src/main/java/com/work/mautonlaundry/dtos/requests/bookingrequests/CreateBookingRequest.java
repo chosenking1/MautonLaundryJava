@@ -21,4 +21,6 @@ public class CreateBookingRequest {
     @NotEmpty
     @Valid
     private List<BookingItemRequest> items;
+
+    private String discountCode;
 }

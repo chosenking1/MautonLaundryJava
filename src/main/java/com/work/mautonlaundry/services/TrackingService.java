@@ -67,6 +67,9 @@ public class TrackingService {
 
     @Transactional
     public void handleLocationUpdate(DeliveryLocationUpdateMessage message, Principal principal) {
+        log.info("Tracking WS update received: bookingId={} principal={}",
+                message.getBookingId(),
+                principal == null ? "null" : principal.getName());
         if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
             throw new ForbiddenOperationException("Authenticated WebSocket session is required");
         }
@@ -85,6 +88,8 @@ public class TrackingService {
                 .orElseThrow(() -> new ForbiddenOperationException("No delivery assignment found for this booking"));
 
         if (!ACTIVE_TRACKING_STATUSES.contains(assignment.getStatus())) {
+            log.warn("Tracking WS rejected: bookingId={} agent={} status={} not in ACTIVE_TRACKING_STATUSES",
+                    booking.getId(), agent.getEmail(), assignment.getStatus());
             throw new ForbiddenOperationException("Delivery assignment is not active for tracking");
         }
 
@@ -100,6 +105,8 @@ public class TrackingService {
         updateAgentPresence(agent.getId());
         broadcastLiveLocation(booking.getId(), snapshot);
         persistRouteHistoryIfDue(booking, agent, snapshot);
+        log.info("Tracking broadcast: bookingId={} lat={} lng={} -> /topic/tracking/{}",
+                booking.getId(), snapshot.lat(), snapshot.lng(), booking.getId());
     }
 
     public Optional<LiveLocationSnapshot> getLatestLocationForBooking(String bookingId) {
@@ -134,8 +141,53 @@ public class TrackingService {
         }
     }
 
+    /**
+     * HTTP-side counterpart of {@link #handleLocationUpdate}. Riders post
+     * each GPS sample here while a delivery is active. We reuse the same
+     * Redis writes + STOMP broadcast so the customer's tracking screen sees
+     * updates regardless of which transport the rider used.
+     *
+     * Why HTTP not WS: stomp_dart_client 1.0.3 (pinned in the rider app)
+     * silently drops SEND frames over SockJS — only SUBSCRIBE works. Plain
+     * HTTP POST sidesteps the issue without forcing a major-version client
+     * library upgrade across both Flutter apps.
+     */
     @Transactional
-    public void handleAvailabilityLocationUpdate(String agentId, double latitude, double longitude, Long timestamp) {
+    public void handleHttpLocationUpdate(AppUser agent, String bookingId,
+                                         double latitude, double longitude, Long timestamp) {
+        log.info("Tracking HTTP update received: bookingId={} agent={}", bookingId, agent.getEmail());
+        if (!agent.hasRole("DELIVERY_AGENT")) {
+            throw new ForbiddenOperationException("User is not a delivery agent");
+        }
+        Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
+
+        // A rider can hold both pickup and return assignments for the same
+        // booking. Filter to the in-flight one — the previous leg is already
+        // COMPLETED so we'd hit NonUniqueResult on the simpler query.
+        List<DeliveryAssignment> activeAssignments = deliveryAssignmentRepository
+                .findByBookingAndDeliveryAgentAndStatusIn(booking, agent, ACTIVE_TRACKING_STATUSES);
+        if (activeAssignments.isEmpty()) {
+            log.warn("Tracking HTTP rejected: bookingId={} agent={} no assignment in active tracking statuses",
+                    booking.getId(), agent.getEmail());
+            throw new ForbiddenOperationException("Delivery assignment is not active for tracking");
+        }
+        DeliveryAssignment assignment = activeAssignments.get(0);
+
+        long resolvedTimestamp = resolveTimestamp(timestamp);
+        LiveLocationSnapshot snapshot = new LiveLocationSnapshot(latitude, longitude, resolvedTimestamp);
+
+        storeLiveLocation(agent.getId(), booking.getId(), snapshot);
+        updateAgentGeoIndex(agent.getId(), snapshot);
+        updateAgentPresence(agent.getId());
+        broadcastLiveLocation(booking.getId(), snapshot);
+        persistRouteHistoryIfDue(booking, agent, snapshot);
+        log.info("Tracking broadcast (HTTP): bookingId={} lat={} lng={} -> /topic/tracking/{}",
+                booking.getId(), snapshot.lat(), snapshot.lng(), booking.getId());
+    }
+
+    @Transactional
+    public void handleAvailabilityLocationUpdate(String agentId, double latitude, double longitude, Instant timestamp) {
         AppUser agent = userRepository.findUserById(agentId)
                 .orElseThrow(() -> new UserNotFoundException("Delivery agent not found"));
         if (!agent.hasRole("DELIVERY_AGENT")) {
@@ -252,5 +304,13 @@ public class TrackingService {
             return Instant.now().getEpochSecond();
         }
         return provided;
+    }
+
+    private long resolveTimestamp(Instant provided) {
+        if (provided == null) {
+            return Instant.now().getEpochSecond();
+        }
+        long seconds = provided.getEpochSecond();
+        return seconds <= 0 ? Instant.now().getEpochSecond() : seconds;
     }
 }

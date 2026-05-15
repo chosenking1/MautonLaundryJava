@@ -18,8 +18,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/discounts")
@@ -56,6 +59,39 @@ public class DiscountController {
         DiscountApplicationResult result = discountService.applyDiscountAtCheckout(
                 code, userId, bookingId, orderValue);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/assignments/my")
+    public ResponseEntity<List<Map<String, Object>>> getMyAssignments() {
+        String userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            return ResponseEntity.status(401).build();
+        }
+        List<DiscountUserAssignment> assignments = discountService.getMyAssignments(userId);
+        List<Map<String, Object>> payload = assignments.stream()
+                .map(a -> {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("id", a.getId());
+                    row.put("discountId", a.getDiscountId());
+                    row.put("approvalStatus", a.getApprovalStatus().name());
+                    row.put("rejectedReason", a.getRejectedReason());
+                    row.put("usageCountCurrent", a.getUsageCountCurrent());
+                    row.put("usageCountLifetime", a.getUsageCountLifetime());
+                    row.put("createdAt", a.getCreatedAt());
+                    discountService.getDiscountById(a.getDiscountId()).ifPresent(d -> {
+                        row.put("code", d.getCode());
+                        row.put("name", d.getName());
+                        row.put("description", d.getDescription());
+                        row.put("ownerType", d.getOwnerType().name());
+                        row.put("discountType", d.getDiscountType().name());
+                        row.put("discountValue", d.getDiscountValue());
+                        row.put("active", d.isActive());
+                        row.put("validUntil", d.getValidUntil());
+                    });
+                    return row;
+                })
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(payload);
     }
 
     @GetMapping("/approvals/pending")

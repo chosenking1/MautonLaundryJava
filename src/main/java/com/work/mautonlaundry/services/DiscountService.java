@@ -8,6 +8,7 @@ import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.enums.ApprovalStatus;
 import com.work.mautonlaundry.data.model.enums.DiscountCheckResult;
 import com.work.mautonlaundry.data.model.enums.DiscountType;
+import com.work.mautonlaundry.data.model.enums.OwnerType;
 import com.work.mautonlaundry.data.model.enums.ResetPeriod;
 import com.work.mautonlaundry.data.repository.BookingRepository;
 import com.work.mautonlaundry.data.repository.DiscountRepository;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -256,6 +258,35 @@ public class DiscountService {
         assignment.setApprovedAt(LocalDateTime.now());
         assignment.setRejectedReason("Staff member access revoked");
         assignmentRepository.save(assignment);
+    }
+
+    public List<DiscountUserAssignment> getMyAssignments(String userId) {
+        return assignmentRepository.findByUserId(userId);
+    }
+
+    public Optional<Discount> getDiscountById(String discountId) {
+        return discountRepository.findById(discountId);
+    }
+
+    /**
+     * Returns the discount code of an APPROVED corporate assignment that the user
+     * currently owns, or null if none. Used at checkout to pre-apply a corporate
+     * discount automatically when the user has not entered a promotional code.
+     */
+    public String findActiveCorporateCodeForUser(String userId) {
+        List<DiscountUserAssignment> approved =
+                assignmentRepository.findByUserIdAndApprovalStatus(userId, ApprovalStatus.APPROVED);
+        for (DiscountUserAssignment assignment : approved) {
+            Discount discount = discountRepository.findById(assignment.getDiscountId()).orElse(null);
+            if (discount == null || !discount.isActive() || discount.getOwnerType() != OwnerType.CORPORATE) {
+                continue;
+            }
+            LocalDateTime now = LocalDateTime.now();
+            if (discount.getValidFrom() != null && now.isBefore(discount.getValidFrom())) continue;
+            if (discount.getValidUntil() != null && now.isAfter(discount.getValidUntil())) continue;
+            return discount.getCode();
+        }
+        return null;
     }
 
     private BigDecimal calculateDiscountAmount(Discount discount, BigDecimal orderValue) {
