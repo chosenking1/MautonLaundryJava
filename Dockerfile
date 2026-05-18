@@ -85,7 +85,7 @@ RUN mkdir -p /apps/config
 
 WORKDIR /apps
 
-COPY --from=build /mautonLaundry/target/*.war app.war
+COPY --from=build /mautonLaundry/target/*.jar app.jar
 
 RUN chown -R spring:spring /apps
 
@@ -99,4 +99,5 @@ ENTRYPOINT ["java", \
 "-Dspring.profiles.active=prod", \
 "-Dspring.config.additional-location=file:/apps/config/", \
 "-jar", \
-"/apps/app.war"]
+"/apps/app.jar"]
+
