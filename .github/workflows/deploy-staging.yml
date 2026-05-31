@@ -1,0 +1,32 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/imototo/MautonLaundryJava
+            git fetch origin
+            git checkout staging
+            git pull origin staging
+            docker stop imototo-backend-staging || true
+            docker rm imototo-backend-staging || true
+            docker build -t imototo-backend-staging .
+            docker run -d \
+              --name imototo-backend-staging \
+              --restart always \
+              --network host \
+              --env-file /opt/imototo/MautonLaundryJava/.env.staging \
+              -p 8080:8079 \
+              imototo-backend-staging
