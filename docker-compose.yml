@@ -1,20 +1,10 @@
 services:
-
   backend:
     build: .
-
     container_name: imototo-backend
-
     restart: always
-
-    ports:
-      - "8079:8079"
-
+    network_mode: host
     env_file:
       - .env
-
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
     volumes:
       - ./config:/apps/config
