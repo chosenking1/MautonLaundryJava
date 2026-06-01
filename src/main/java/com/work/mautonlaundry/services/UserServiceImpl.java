@@ -312,12 +312,17 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
+    @Transactional
     public void sendEmailVerification(String email) {
         log.info("Starting email verification process for: {}", email);
-        
+
         AppUser user = userRepository.findUserByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
-        
+
+        // Invalidate any previous verification token so a re-send replaces it
+        // (only the latest token stays valid) instead of colliding.
+        tokenRepository.deleteByUserIdAndTokenType(user.getId(), VerificationToken.TokenType.EMAIL_VERIFICATION);
+
         String token = tokenGenerator.generateSecureToken();
         VerificationToken verificationToken = new VerificationToken(token, user, VerificationToken.TokenType.EMAIL_VERIFICATION, verificationTokenExpiryHours);
         tokenRepository.save(verificationToken);
@@ -351,10 +356,14 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
+    @Transactional
     public void sendPasswordResetEmail(String email) {
         AppUser user = userRepository.findUserByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
-        
+
+        // Replace any previous password-reset token for this user.
+        tokenRepository.deleteByUserIdAndTokenType(user.getId(), VerificationToken.TokenType.PASSWORD_RESET);
+
         String token = tokenGenerator.generateSecureToken();
         VerificationToken resetToken = new VerificationToken(token, user, VerificationToken.TokenType.PASSWORD_RESET, passwordResetTokenExpiryHours);
         tokenRepository.save(resetToken);

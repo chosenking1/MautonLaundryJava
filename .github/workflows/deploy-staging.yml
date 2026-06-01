@@ -19,10 +19,10 @@ jobs:
             cd /opt/imototo/MautonLaundryJava
             git fetch origin
             git checkout staging
-            git pull origin staging
+            git reset --hard origin/staging
             docker stop imototo-backend-staging || true
             docker rm imototo-backend-staging || true
-            docker build -t imototo-backend-staging .
+            docker build --pull --no-cache -t imototo-backend-staging .
             docker run -d \
               --name imototo-backend-staging \
               --restart always \

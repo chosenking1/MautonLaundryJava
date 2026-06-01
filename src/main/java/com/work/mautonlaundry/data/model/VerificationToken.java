@@ -19,7 +19,11 @@ public class VerificationToken {
     @Column(nullable = false, unique = true)
     private String token;
     
-    @OneToOne
+    // ManyToOne (not OneToOne): a user may hold several tokens over time and of
+    // different types (email verification, password reset). OneToOne forced a
+    // UNIQUE(user_id) constraint that made re-sends and concurrent token types
+    // fail with a duplicate-key error.
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private AppUser user;
     
