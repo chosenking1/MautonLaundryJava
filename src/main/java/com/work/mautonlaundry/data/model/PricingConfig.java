@@ -32,7 +32,8 @@ public class PricingConfig {
     public enum ConfigKey {
         EXPRESS_FEE("EXPRESS_FEE"),
         DELIVERY_FEE("DELIVERY_FEE"),
-        FREE_DELIVERY_THRESHOLD("FREE_DELIVERY_THRESHOLD");
+        FREE_DELIVERY_THRESHOLD("FREE_DELIVERY_THRESHOLD"),
+        IMOTOTO_COMMISSION_RATE("IMOTOTO_COMMISSION_RATE");
 
         private final String value;
 
