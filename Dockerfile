@@ -100,4 +100,3 @@ ENTRYPOINT ["java", \
 "-Dspring.config.additional-location=file:/apps/config/", \
 "-jar", \
 "/apps/app.jar"]
-

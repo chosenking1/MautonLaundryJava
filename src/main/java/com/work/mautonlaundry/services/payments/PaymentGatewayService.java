@@ -34,6 +34,10 @@ public class PaymentGatewayService {
     private final BookingRepository bookingRepository;
     private final PaymentGatewayRouter gatewayRouter;
     private final BookingService bookingService;
+    private final com.work.mautonlaundry.services.ReferralService referralService;
+
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(PaymentGatewayService.class);
 
     private BigDecimal resolvePayableAmount(Booking booking, BigDecimal fallbackAmount) {
         BigDecimal amount = booking.getFinalAmount();
@@ -124,6 +128,14 @@ public class PaymentGatewayService {
         // dispatch can be enqueued.
         if (event.getStatus() == PaymentStatus.COMPLETED && payment.getBooking() != null) {
             bookingService.resumeAfterPaymentIfReady(payment.getBooking().getId());
+
+            // Non-blocking referral booking event — must never fail the payment/booking flow.
+            try {
+                referralService.recordReferralBookingEvent(payment.getBooking().getId());
+            } catch (Exception ex) {
+                log.warn("Referral booking event recording skipped for booking {}: {}",
+                        payment.getBooking().getId(), ex.getMessage());
+            }
         }
     }
 

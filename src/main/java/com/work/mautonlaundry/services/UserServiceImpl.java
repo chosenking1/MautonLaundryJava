@@ -78,6 +78,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private AuditService auditService;
 
     @Autowired
+    @Lazy
+    private ReferralService referralService;
+
+    @Autowired
     public UserServiceImpl(UserRepository userRepository, AddressRepository addressRepository, RoleRepository roleRepository, VerificationTokenRepository tokenRepository,
                            EmailService emailService, TokenGenerator tokenGenerator, CacheManager cacheManager,
                            @Lazy AuthService authService, PasswordEncoder passwordEncoder, ModelMapper mapper,
@@ -137,6 +141,13 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             address.setDeleted(false);
             
             addressRepository.save(address);
+        }
+
+        // Non-blocking referral attribution — a bad/missing code must never fail signup.
+        try {
+            referralService.applyReferralAtRegistration(savedUser.getId(), request.getReferralCode());
+        } catch (Exception ex) {
+            log.warn("Referral attribution skipped for {}: {}", savedUser.getEmail(), ex.getMessage());
         }
 
         auditService.logAction("CREATE", "USER", savedUser.getEmail());

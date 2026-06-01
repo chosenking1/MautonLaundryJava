@@ -269,6 +269,27 @@ public class DiscountService {
     }
 
     /**
+     * Assigns a discount to a user as an already-approved welcome incentive,
+     * idempotently. Used by the referral system when a referred customer
+     * registers via a referral whose referrer has a linked discount. Returns the
+     * existing or newly created assignment; no-op if the discount is missing or
+     * inactive.
+     */
+    @Transactional
+    public Optional<DiscountUserAssignment> assignWelcomeDiscount(String discountId, AppUser user) {
+        Discount discount = discountRepository.findById(discountId).orElse(null);
+        if (discount == null || !discount.isActive()) {
+            return Optional.empty();
+        }
+        Optional<DiscountUserAssignment> existing =
+                assignmentRepository.findByDiscountIdAndUserId(discountId, user.getId());
+        if (existing.isPresent()) {
+            return existing;
+        }
+        return Optional.of(createApprovedAssignment(discount, user));
+    }
+
+    /**
      * Returns the discount code of an APPROVED corporate assignment that the user
      * currently owns, or null if none. Used at checkout to pre-apply a corporate
      * discount automatically when the user has not entered a promotional code.

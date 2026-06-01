@@ -121,6 +121,39 @@ public class PricingEngine {
         return getPricingConfig();
     }
 
+    /**
+     * Imototo's commission rate as a decimal fraction (default 0.30). This is
+     * the share of laundry/service revenue Imototo keeps and out of which
+     * referral commission is paid. Admin-editable via pricing config.
+     */
+    public BigDecimal getImototoCommissionRate() {
+        return pricingConfigRepository.findTopByKeyOrderByEffectiveFromDesc(PricingConfig.ConfigKey.IMOTOTO_COMMISSION_RATE.getValue())
+                .map(config -> new BigDecimal(config.getValue()))
+                .orElse(new BigDecimal("0.30"));
+    }
+
+    /**
+     * Imototo's commission on a single booking: the configured commission rate
+     * applied to the service revenue (items subtotal + express surcharge, after
+     * any welcome discount; delivery fee excluded). Derived from booking totals:
+     * {@code totalPrice} already includes items + delivery + express, so
+     * {@code totalPrice - deliveryFee} is exactly items + express. The welcome
+     * discount is then subtracted (Imototo earns on its net take). Never negative.
+     */
+    public BigDecimal calculateImototoCommissionForBooking(BigDecimal totalPrice,
+                                                           BigDecimal deliveryFee,
+                                                           BigDecimal discountAmount) {
+        BigDecimal total = totalPrice == null ? BigDecimal.ZERO : totalPrice;
+        BigDecimal delivery = deliveryFee == null ? BigDecimal.ZERO : deliveryFee;
+        BigDecimal discount = discountAmount == null ? BigDecimal.ZERO : discountAmount;
+
+        BigDecimal commissionBase = total.subtract(delivery).subtract(discount);
+        if (commissionBase.compareTo(BigDecimal.ZERO) < 0) {
+            commissionBase = BigDecimal.ZERO;
+        }
+        return commissionBase.multiply(getImototoCommissionRate()).setScale(2, RoundingMode.HALF_UP);
+    }
+
     private void upsertConfig(PricingConfig.ConfigKey key, BigDecimal value) {
         PricingConfig config = pricingConfigRepository.findByKey(key.getValue())
                 .orElseGet(PricingConfig::new);

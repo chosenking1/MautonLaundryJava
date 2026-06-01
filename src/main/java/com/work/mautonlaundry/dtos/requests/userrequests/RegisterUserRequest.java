@@ -27,7 +27,10 @@ public class RegisterUserRequest {
     
     @NotBlank(message = "Password is required")
     private String password;
-    
+
+    // Optional referral code — attributes this user to a referrer at registration.
+    private String referralCode;
+
     // Optional address fields
     private String street;
     private Integer streetNumber;
