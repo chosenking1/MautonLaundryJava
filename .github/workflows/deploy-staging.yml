@@ -1,4 +1,4 @@
-name: Deploy Staging
+name: Deploy Staging Backend
 
 on:
   push:
@@ -28,5 +28,4 @@ jobs:
               --restart always \
               --network host \
               --env-file /opt/imototo/MautonLaundryJava/.env.staging \
-              -p 8080:8079 \
               imototo-backend-staging
