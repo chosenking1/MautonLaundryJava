@@ -11,4 +11,6 @@ public class UpdatePricingConfigRequest {
     private BigDecimal expressFee;
     @JsonAlias({"minimumOrderAmount"})
     private BigDecimal freeDeliveryThreshold;
+    /** Imototo's commission as a decimal fraction (e.g. 0.30 = 30%). Drives platform earnings + referral commission. */
+    private BigDecimal imototoCommissionRate;
 }

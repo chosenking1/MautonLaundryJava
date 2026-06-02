@@ -32,7 +32,11 @@ public class AnalyticsService {
         DashboardAnalyticsResponse analytics = new DashboardAnalyticsResponse();
 
         analytics.setTotalUsers(safeLong(userRepository.countByDeletedFalse()));
-        analytics.setActiveUsers(safeLong(userRepository.countByDeletedFalseAndOnlineTrue()));
+        // Active users = customers who placed an order in the last 30 days (recency-based).
+        // Previously this used the `online` boolean, which defaults TRUE and is never reset
+        // for customers, so it counted essentially every user and only ever grew.
+        LocalDateTime activeWindowStart = LocalDateTime.now().minusDays(30);
+        analytics.setActiveUsers(safeLong(userRepository.countUsersWithBookingsAfter(activeWindowStart)));
 
         LocalDateTime startOfToday = LocalDateTime.now().toLocalDate().atStartOfDay();
         analytics.setTotalBookings(safeLong(bookingRepository.countActiveBookings()));
