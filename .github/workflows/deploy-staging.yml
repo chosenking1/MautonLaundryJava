@@ -16,16 +16,14 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd /opt/imototo/MautonLaundryJava
-            git fetch origin
-            git checkout staging
-            git reset --hard origin/staging
+            cd /opt/imototo/MautonLaundryJava-staging
+            git pull origin staging
             docker stop imototo-backend-staging || true
             docker rm imototo-backend-staging || true
-            docker build --pull --no-cache -t imototo-backend-staging .
+            docker build -t imototo-backend-staging .
             docker run -d \
               --name imototo-backend-staging \
               --restart always \
               --network host \
-              --env-file /opt/imototo/MautonLaundryJava/.env.staging \
+              --env-file /opt/imototo/MautonLaundryJava-staging/.env.staging \
               imototo-backend-staging
