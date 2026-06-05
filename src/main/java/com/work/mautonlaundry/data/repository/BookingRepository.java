@@ -86,4 +86,14 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.deleted = false AND b.createdAt BETWEEN :start AND :end")
     Long countBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // Per-customer order aggregate. Row = [userId, orderCount, lastOrderDate]. Used by Customer Intelligence.
+    @Query("SELECT b.user.id, COUNT(b), MAX(b.createdAt) FROM Booking b WHERE b.deleted = false GROUP BY b.user.id")
+    List<Object[]> aggregateOrdersPerCustomer();
+
+    // Per-customer order count within a half-open period [start, end). Row = [userId, orderCount].
+    @Query("SELECT b.user.id, COUNT(b) FROM Booking b WHERE b.deleted = false " +
+            "AND b.createdAt >= :start AND b.createdAt < :end GROUP BY b.user.id")
+    List<Object[]> aggregateOrdersPerCustomerInPeriod(@Param("start") LocalDateTime start,
+                                                      @Param("end") LocalDateTime end);
 }

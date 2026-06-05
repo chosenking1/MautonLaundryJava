@@ -9,4 +9,5 @@ public class PricingConfigResponse {
     private BigDecimal expressFee;
     private BigDecimal deliveryFee;
     private BigDecimal freeDeliveryThreshold;
+    private BigDecimal imototoCommissionRate;
 }

@@ -47,4 +47,31 @@ public interface UserRepository extends JpaRepository<AppUser, String> {
     @Query("SELECT DISTINCT u FROM AppUser u LEFT JOIN Booking b ON u = b.user AND b.deleted = false " +
            "WHERE b.createdAt BETWEEN :start AND :end AND u.deleted = false")
     List<AppUser> findUsersWithActivityBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // First-time customers: distinct users whose first-ever order falls in [start, end)
+    // (i.e. they ordered in the window and had no order before it).
+    @Query("SELECT COUNT(DISTINCT b.user) FROM Booking b WHERE b.deleted = false " +
+           "AND b.createdAt >= :start AND b.createdAt < :end " +
+           "AND b.user NOT IN (SELECT b2.user FROM Booking b2 WHERE b2.deleted = false AND b2.createdAt < :start)")
+    Long countFirstTimeCustomersBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // Returning customers: distinct users who ordered in [start, end) and had also ordered before start.
+    @Query("SELECT COUNT(DISTINCT b.user) FROM Booking b WHERE b.deleted = false " +
+           "AND b.createdAt >= :start AND b.createdAt < :end " +
+           "AND b.user IN (SELECT b2.user FROM Booking b2 WHERE b2.deleted = false AND b2.createdAt < :start)")
+    Long countReturningCustomersBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // Total customers = distinct users who have placed at least one (non-deleted) order.
+    @Query("SELECT COUNT(DISTINCT b.user) FROM Booking b WHERE b.deleted = false")
+    Long countDistinctCustomers();
+
+    // All customers (role USER) who have placed at least one order. Aggregated metrics
+    // are assembled in the service from batch queries — sufficient at launch scale.
+    @Query("SELECT DISTINCT b.user FROM Booking b WHERE b.deleted = false AND b.user.role.name = 'USER'")
+    List<AppUser> findCustomersWithOrders();
+
+    // Inactive customers: have ordered before, but no order since :since (e.g. now - 45 days). Churn risk.
+    @Query("SELECT COUNT(DISTINCT b.user) FROM Booking b WHERE b.deleted = false " +
+           "AND b.user NOT IN (SELECT b2.user FROM Booking b2 WHERE b2.deleted = false AND b2.createdAt >= :since)")
+    Long countInactiveCustomers(@Param("since") LocalDateTime since);
 }
