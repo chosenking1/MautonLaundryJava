@@ -97,6 +97,7 @@ public class PricingEngine {
         response.setExpressFee(getExpressFee());
         response.setDeliveryFee(getDeliveryFee());
         response.setFreeDeliveryThreshold(getFreeDeliveryThreshold());
+        response.setImototoCommissionRate(getImototoCommissionRate());
         return response;
     }
 
@@ -113,6 +114,14 @@ public class PricingEngine {
         }
         if (request.getFreeDeliveryThreshold() != null) {
             upsertConfig(PricingConfig.ConfigKey.FREE_DELIVERY_THRESHOLD, request.getFreeDeliveryThreshold());
+            updated = true;
+        }
+        if (request.getImototoCommissionRate() != null) {
+            BigDecimal rate = request.getImototoCommissionRate();
+            if (rate.compareTo(BigDecimal.ZERO) < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
+                throw new IllegalArgumentException("imototoCommissionRate must be a fraction between 0 and 1 (e.g. 0.30 for 30%)");
+            }
+            upsertConfig(PricingConfig.ConfigKey.IMOTOTO_COMMISSION_RATE, rate);
             updated = true;
         }
         if (!updated) {

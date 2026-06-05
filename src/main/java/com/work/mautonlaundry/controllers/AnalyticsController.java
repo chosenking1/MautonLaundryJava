@@ -1,10 +1,12 @@
 package com.work.mautonlaundry.controllers;
 
 import com.work.mautonlaundry.dtos.responses.analytics.DashboardAnalyticsResponse;
+import com.work.mautonlaundry.dtos.responses.analytics.ExecutiveDashboardResponse;
 import com.work.mautonlaundry.dtos.responses.analytics.MonthlyStatsResponse;
 import com.work.mautonlaundry.dtos.responses.analytics.TimeSeriesResponse;
 import com.work.mautonlaundry.dtos.responses.analytics.UsersByRoleResponse;
 import com.work.mautonlaundry.services.AnalyticsService;
+import com.work.mautonlaundry.services.ExecutiveDashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +22,13 @@ import java.time.LocalDate;
 public class AnalyticsController {
     
     private final AnalyticsService analyticsService;
-    
+    private final ExecutiveDashboardService executiveDashboardService;
+
+    @GetMapping("/executive")
+    public ResponseEntity<ExecutiveDashboardResponse> getExecutiveDashboard() {
+        return ResponseEntity.ok(executiveDashboardService.getExecutiveDashboard());
+    }
+
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardAnalyticsResponse> getDashboardAnalytics(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

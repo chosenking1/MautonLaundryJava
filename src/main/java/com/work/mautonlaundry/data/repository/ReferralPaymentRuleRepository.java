@@ -2,6 +2,7 @@ package com.work.mautonlaundry.data.repository;
 
 import com.work.mautonlaundry.data.model.ReferralPaymentRule;
 import com.work.mautonlaundry.data.model.enums.ReferralPaymentFrequency;
+import com.work.mautonlaundry.data.model.enums.ReferralRuleType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,4 +34,9 @@ public interface ReferralPaymentRuleRepository extends JpaRepository<ReferralPay
     @Query("SELECT DISTINCT r.referrerId FROM ReferralPaymentRule r " +
             "WHERE r.active = true AND r.paymentFrequency = :frequency")
     List<String> findReferrerIdsWithActiveFrequency(@Param("frequency") ReferralPaymentFrequency frequency);
+
+    /** Referrers with at least one active rule of the given type (e.g. MANUAL_OVERRIDE = on salary). */
+    @Query("SELECT DISTINCT r.referrerId FROM ReferralPaymentRule r " +
+            "WHERE r.active = true AND r.ruleType = :ruleType")
+    List<String> findReferrerIdsWithActiveRuleType(@Param("ruleType") ReferralRuleType ruleType);
 }
