@@ -7,11 +7,13 @@ import com.work.mautonlaundry.data.model.enums.ScopeLevel;
 import com.work.mautonlaundry.data.repository.PermissionRepository;
 import com.work.mautonlaundry.data.repository.UserPermissionRepository;
 import com.work.mautonlaundry.data.repository.UserScopeRepository;
+import com.work.mautonlaundry.security.MakerCheckerService;
 import com.work.mautonlaundry.security.PermissionEvaluationService;
 import com.work.mautonlaundry.security.scope.ScopeFilterService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,20 +32,17 @@ import java.util.UUID;
  * hand-written SQL: the evaluation engine read them, but nothing in the
  * application could change them.
  *
- * <h2>The escalation ceiling</h2>
- * You may only grant a permission you personally hold (spec §2.2). This is the
- * rule that stops PERMISSION_ASSIGN from being a route to everything: holding it
- * lets you delegate what you have, never mint what you lack.
+ * <h2>The escalation ceiling, and the way around it</h2>
+ * Granting a permission you hold executes immediately. Granting one you do not
+ * hold does not fail -- it opens a maker-checker request (spec §2.2), so a
+ * Permission Admin can delegate anything in the system while someone who can
+ * actually evaluate it signs it off. Only lacking PERMISSION_ASSIGN itself is a
+ * flat refusal, and that is enforced at the endpoint.
  *
- * <p>DENY and REVOKE are deliberately exempt. Taking a permission away is not an
- * escalation, and requiring you to hold something before you can remove it would
- * make an over-granted permission impossible to claw back by exactly the people
- * most likely to notice.
- *
- * <h2>Not yet: maker-checker</h2>
- * Spec §2.3 routes an assignment beyond the actor's own set through an approval
- * request rather than rejecting it. MakerCheckerService does not exist yet, so
- * this rejects -- the safe half. The throw site becomes the submit path later.
+ * <p>DENY and REVOKE are deliberately exempt from both. Taking a permission away
+ * is not an escalation, and requiring you to hold something before you can
+ * remove it would make an over-granted permission impossible to claw back by
+ * exactly the people most likely to notice.
  *
  * <h2>Not yet: pending_permission_review</h2>
  * Spec §2.1 says reducing someone's permissions should flag the grants they
@@ -65,16 +64,60 @@ public class UserAccessService {
     private final ScopeFilterService scopeFilterService;
     private final AuditService auditService;
 
+    /** Lazy: MakerCheckerService calls grantApproved() back into this service on approval. */
+    @Lazy
+    private final MakerCheckerService makerCheckerService;
+
     /**
      * Grants a permission directly to a user, overriding their role.
      *
-     * @throws IllegalArgumentException if the actor does not hold it (spec §2.2)
+     * <p>Completes spec §2.2's table. If the actor holds the permission it
+     * executes immediately; if not, it does NOT fail -- a maker-checker request
+     * is opened instead, so a Permission Admin can delegate anything in the
+     * system while someone who can actually evaluate it signs it off.
+     *
+     * @return the outcome; EXECUTED or PENDING_APPROVAL. Callers must not assume
+     *         a non-exception means the grant happened.
      */
     @Transactional
-    public void grant(String userId, Long permissionId, String actorId) {
+    public GrantOutcome grant(String userId, Long permissionId, String actorId) {
         Permission permission = require(permissionId);
-        requireActorHolds(permission, actorId);
+
+        if (!permissionEvaluationService.getEffectivePermissions(actorId).contains(permission.getName())) {
+            // Spec §2.2 row 3: has PERMISSION_ASSIGN, lacks the target permission
+            // -> maker-checker, not a refusal.
+            String requestId = makerCheckerService
+                    .submitPermissionAssign(actorId, userId, permissionId).getId();
+            log.info("{} cannot grant {} directly; opened maker-checker request {}",
+                    actorId, permission.getName(), requestId);
+            return new GrantOutcome(false, requestId);
+        }
+
         upsert(userId, permission, GrantType.GRANT, actorId);
+        return new GrantOutcome(true, null);
+    }
+
+    /**
+     * Executes a grant a checker has approved, bypassing the holds-check.
+     *
+     * <p>Not a hole: MakerCheckerService has already verified the checker
+     * personally holds the permission (spec §2.3), which is a stronger guarantee
+     * than the direct path's -- two people signed off instead of one. Package
+     * boundaries cannot express "only reachable post-approval", so this carries
+     * the requirement in its name and its javadoc.
+     *
+     * @param checkerId the approver, who is the one accountable for the grant
+     */
+    @Transactional
+    public void grantApproved(String userId, Long permissionId, String checkerId) {
+        upsert(userId, require(permissionId), GrantType.GRANT, checkerId);
+    }
+
+    /** @param requestId non-null only when the grant is awaiting approval */
+    public record GrantOutcome(boolean executed, String requestId) {
+        public boolean pendingApproval() {
+            return !executed;
+        }
     }
 
     /**
@@ -170,16 +213,6 @@ public class UserAccessService {
         auditService.logChange("PERMISSION_" + type.name(), "USER_PERMISSION", userId, oldValue, newValue);
 
         log.info("{} set {} to {} for {}", actorId, permission.getName(), type, userId);
-    }
-
-    /** Spec §2.2: delegate what you hold, never mint what you lack. */
-    private void requireActorHolds(Permission permission, String actorId) {
-        Set<String> held = permissionEvaluationService.getEffectivePermissions(actorId);
-        if (!held.contains(permission.getName())) {
-            // Spec §2.3 would open a maker-checker request here instead.
-            throw new IllegalArgumentException(
-                    "You cannot grant a permission you do not hold: " + permission.getName());
-        }
     }
 
     private Permission require(Long permissionId) {
