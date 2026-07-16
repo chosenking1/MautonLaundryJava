@@ -18,12 +18,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/cas")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class CasPerformanceController {
 
     private final CasPerformanceService casPerformanceService;
 
     @GetMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CAS_PERFORMANCE_VIEW')")
     public ResponseEntity<List<CasListItemResponse>> list(
             @RequestParam(defaultValue = "revenueGenerated") String sort,
             @RequestParam(defaultValue = "desc") String direction,
@@ -32,6 +32,7 @@ public class CasPerformanceController {
     }
 
     @GetMapping("/export")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CAS_PERFORMANCE_EXPORT')")
     public ResponseEntity<String> export(
             @RequestParam(defaultValue = "revenueGenerated") String sort,
             @RequestParam(defaultValue = "desc") String direction,
@@ -48,6 +49,7 @@ public class CasPerformanceController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CAS_PERFORMANCE_VIEW')")
     public ResponseEntity<CasProfileResponse> profile(@PathVariable String id) {
         return ResponseEntity.ok(casPerformanceService.getCasProfile(id));
     }

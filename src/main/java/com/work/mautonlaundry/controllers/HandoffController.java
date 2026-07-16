@@ -23,7 +23,7 @@ public class HandoffController {
     private final HandoffCodeService handoffCodeService;
 
     @PostMapping("/redeem")
-    @PreAuthorize("hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('HANDOFF_VERIFY')")
     public ResponseEntity<HandoffRedemptionResponse> redeem(
             @Valid @RequestBody RedeemHandoffCodeRequest request) {
         AppUser rider = SecurityUtil.getCurrentUser().orElseThrow();

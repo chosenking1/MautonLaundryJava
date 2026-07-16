@@ -17,7 +17,7 @@ import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/admin/analytics")
-@PreAuthorize("hasAuthority('ANALYTICS_READ')")
+@PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ANALYTICS_READ')")
 @RequiredArgsConstructor
 public class AnalyticsController {
     

@@ -296,7 +296,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     @Transactional
-    @PreAuthorize("hasAuthority('USER_UPDATE')") // Changed from hasRole('ADMIN')
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('USER_UPDATE')")
     public void updateUserRole(UpdateUserRoleRequest request) {
         // This method should be deprecated or updated to use RoleChangeRequest
         // For now, we'll implement direct update for ADMINs as a fallback

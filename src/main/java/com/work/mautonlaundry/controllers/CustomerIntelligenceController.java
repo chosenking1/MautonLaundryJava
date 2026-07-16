@@ -22,12 +22,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/customers")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class CustomerIntelligenceController {
 
     private final CustomerIntelligenceService customerIntelligenceService;
 
     @GetMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CUSTOMER_VIEW')")
     public ResponseEntity<Page<CustomerListItemResponse>> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String acquisitionSource,
@@ -44,6 +44,7 @@ public class CustomerIntelligenceController {
     }
 
     @GetMapping("/export")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CUSTOMER_EXPORT')")
     public ResponseEntity<String> exportCustomers(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String acquisitionSource,
@@ -68,11 +69,13 @@ public class CustomerIntelligenceController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CUSTOMER_VIEW')")
     public ResponseEntity<CustomerProfileResponse> profile(@PathVariable String id) {
         return ResponseEntity.ok(customerIntelligenceService.getCustomerProfile(id));
     }
 
     @GetMapping("/{id}/orders/export")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CUSTOMER_EXPORT')")
     public ResponseEntity<String> exportOrderHistory(@PathVariable String id) {
         CustomerProfileResponse profile = customerIntelligenceService.getCustomerProfile(id);
         String csv = CsvUtil.toCsv(

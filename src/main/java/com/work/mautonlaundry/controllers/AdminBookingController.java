@@ -27,7 +27,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/bookings")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminBookingController {
 
     private final BookingService bookingService;
@@ -35,6 +34,7 @@ public class AdminBookingController {
     private final BookingRepository bookingRepository;
 
     @GetMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ORDER_VIEW_ALL')")
     public ResponseEntity<Page<BookingDetailsResponse>> getAllBookings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -59,6 +59,7 @@ public class AdminBookingController {
     }
 
     @PostMapping("/{bookingId}/laundry-agent/{laundryAgentId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ORDER_ASSIGN')")
     public ResponseEntity<MessageResponse> assignLaundryAgentByAdmin(
             @PathVariable String bookingId,
             @PathVariable String laundryAgentId) {
@@ -67,6 +68,7 @@ public class AdminBookingController {
     }
 
     @PostMapping("/{bookingId}/force-reassign/{laundryAgentId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ORDER_ASSIGN')")
     public ResponseEntity<MessageResponse> forceReassignLaundryAgent(
             @PathVariable String bookingId,
             @PathVariable String laundryAgentId) {
@@ -75,6 +77,7 @@ public class AdminBookingController {
     }
 
     @PostMapping("/{bookingId}/codes/regenerate")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('HANDOFF_CODE_REGENERATE')")
     public ResponseEntity<HandoffCodeView> regenerateHandoffCode(
             @PathVariable String bookingId,
             @Valid @RequestBody RegenerateHandoffCodeRequest request) {
@@ -96,6 +99,7 @@ public class AdminBookingController {
     }
 
     @GetMapping("/{bookingId}/timeline")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ORDER_VIEW_ALL')")
     public ResponseEntity<List<BookingTimelineEntryResponse>> getTimeline(@PathVariable String bookingId) {
         return ResponseEntity.ok(bookingService.getStatusTimeline(bookingId));
     }

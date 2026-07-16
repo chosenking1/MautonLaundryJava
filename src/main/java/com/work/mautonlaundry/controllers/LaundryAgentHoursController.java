@@ -28,12 +28,12 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/admin/laundry-agents")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class LaundryAgentHoursController {
 
     private final LaundryAgentHoursService laundryAgentHoursService;
 
     @GetMapping("/{agentId}/hours")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_HOURS_VIEW')")
     public ResponseEntity<List<Map<String, Object>>> getHours(@PathVariable String agentId) {
         List<LaundryAgentHours> rows = laundryAgentHoursService.getHoursFor(agentId);
         List<Map<String, Object>> out = rows.stream()
@@ -46,6 +46,7 @@ public class LaundryAgentHoursController {
     }
 
     @PutMapping("/{agentId}/hours")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_HOURS_EDIT')")
     public ResponseEntity<List<Map<String, Object>>> setHours(
             @PathVariable String agentId,
             @RequestBody UpdateHoursRequest body) {

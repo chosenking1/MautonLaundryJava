@@ -11,12 +11,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
 
     private final UserService userService;
 
     @PatchMapping("/{userId}/deactivate-agent")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_DEACTIVATE')")
     public ResponseEntity<MessageResponse> deactivateAgent(
             @PathVariable String userId,
             @RequestBody(required = false) DeactivateAgentRequest request) {

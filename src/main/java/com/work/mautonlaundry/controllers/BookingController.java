@@ -37,7 +37,7 @@ public class BookingController {
     private final BookingRepository bookingRepository;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('BOOKING_CREATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_CREATE')")
     public ResponseEntity<CreateBookingResponse> createBooking(
             @Valid @RequestBody CreateBookingRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
@@ -46,7 +46,7 @@ public class BookingController {
     }
 
     @PostMapping("/estimate")
-    @PreAuthorize("hasAuthority('BOOKING_CREATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_CREATE')")
     public ResponseEntity<BookingEstimateResponse> estimateBooking(
             @Valid @RequestBody BookingEstimateRequest request) {
         return ResponseEntity.ok(bookingService.estimateBooking(request));
@@ -85,14 +85,14 @@ public class BookingController {
     }
 
     @GetMapping("/{bookingId}")
-    @PreAuthorize("hasAuthority('BOOKING_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_READ')")
     public ResponseEntity<BookingDetailsResponse> getBooking(@PathVariable String bookingId) {
         BookingDetailsResponse response = bookingService.getBookingDetails(bookingId);
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{bookingId}/status")
-    @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_UPDATE')")
     public ResponseEntity<MessageResponse> updateBookingStatus(
             @PathVariable String bookingId,
             @Valid @RequestBody UpdateBookingStatusRequest request) {
@@ -120,21 +120,21 @@ public class BookingController {
     }
 
     @PostMapping("/{bookingId}/laundry/received")
-    @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_UPDATE')")
     public ResponseEntity<MessageResponse> markLaundryReceived(@PathVariable String bookingId) {
         bookingService.markLaundryReceived(bookingId);
         return ResponseEntity.ok(new MessageResponse("Booking received by laundry"));
     }
 
     @PostMapping("/{bookingId}/laundry/accept")
-    @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_UPDATE')")
     public ResponseEntity<MessageResponse> acceptLaundryAssignment(@PathVariable String bookingId) {
         bookingService.acceptLaundryAssignment(bookingId);
         return ResponseEntity.ok(new MessageResponse("Laundry assignment accepted"));
     }
 
     @PostMapping("/{bookingId}/laundry/completed")
-    @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_UPDATE')")
     public ResponseEntity<MessageResponse> markLaundryCompleted(@PathVariable String bookingId) {
         bookingService.markLaundryCompleted(bookingId);
         return ResponseEntity.ok(new MessageResponse("Laundry completed and delivery dispatch queued"));
@@ -147,7 +147,7 @@ public class BookingController {
     }
 
     @PostMapping("/{bookingId}/delivery/early-response")
-    @PreAuthorize("hasAuthority('BOOKING_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_READ')")
     public ResponseEntity<MessageResponse> respondToEarlyDelivery(
             @PathVariable String bookingId,
             @RequestBody Map<String, Boolean> body) {
@@ -162,7 +162,7 @@ public class BookingController {
     }
 
     @GetMapping("/{bookingId}/coordinates")
-    @PreAuthorize("hasAuthority('BOOKING_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_READ')")
     public ResponseEntity<Map<String, Double>> getDeliveryCoordinates(@PathVariable String bookingId) {
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
         Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)

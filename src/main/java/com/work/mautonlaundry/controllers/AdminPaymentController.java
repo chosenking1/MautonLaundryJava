@@ -12,12 +12,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/admin/payments")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminPaymentController {
 
     private final PaymentService paymentService;
 
     @PatchMapping("/{paymentId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYMENT_EDIT')")
     public ResponseEntity<CreatePaymentResponse> updatePayment(
             @PathVariable Long paymentId,
             @Valid @RequestBody PaymentUpdateRequest request) {

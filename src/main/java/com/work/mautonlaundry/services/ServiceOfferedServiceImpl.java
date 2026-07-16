@@ -29,7 +29,7 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService {
         this.categoryRepository = categoryRepository;
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_CREATE')")
     @Transactional
     public AddServiceResponse addService(AddServiceRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
@@ -73,7 +73,7 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService {
         return serviceRepository;
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_EDIT')")
     @Override
     public UpdateServiceResponse serviceDetailsUpdate(UpdateServiceRequest request) {
         Services existingService = serviceRepository.findById(request.getId())
@@ -106,7 +106,7 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService {
         return response;
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_DELETE')")
     @Override
     public void deleteServiceById(Long id) {
         Services service = serviceRepository.findById(id)
@@ -116,7 +116,7 @@ public class ServiceOfferedServiceImpl implements ServiceOfferedService {
         serviceRepository.save(service);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_DELETE')")
     @Override
     public void deleteServiceByName(String serviceName) {
         throw new UnsupportedOperationException("Delete by name not implemented");

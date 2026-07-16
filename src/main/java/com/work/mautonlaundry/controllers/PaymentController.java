@@ -28,32 +28,32 @@ public class PaymentController {
     private final PaymentGatewayService paymentGatewayService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('PAYMENT_CREATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYMENT_CREATE')")
     public ResponseEntity<CreatePaymentResponse> createPayment(@Valid @RequestBody CreatePaymentRequest request) {
         CreatePaymentResponse response = paymentService.createPayment(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @GetMapping("/{paymentId}")
-    @PreAuthorize("hasAuthority('PAYMENT_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYMENT_READ')")
     public ResponseEntity<CreatePaymentResponse> getPaymentById(@PathVariable Long paymentId) {
         return ResponseEntity.ok(paymentService.getPaymentById(paymentId));
     }
 
     @GetMapping("/booking/{bookingId}")
-    @PreAuthorize("hasAuthority('PAYMENT_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYMENT_READ')")
     public ResponseEntity<CreatePaymentResponse> getPaymentByBooking(@PathVariable String bookingId) {
         return ResponseEntity.ok(paymentService.getPaymentByBookingId(bookingId));
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PAYMENT_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYMENT_READ')")
     public ResponseEntity<List<CreatePaymentResponse>> getMyPayments() {
         return ResponseEntity.ok(paymentService.getMyPayments());
     }
 
     @PostMapping("/initiate")
-    @PreAuthorize("hasAuthority('PAYMENT_CREATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYMENT_CREATE')")
     public ResponseEntity<GatewayPaymentInitiationResponse> initiateGatewayPayment(
             @Valid @RequestBody InitiateGatewayPaymentRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(paymentGatewayService.initiatePayment(request));
@@ -69,7 +69,7 @@ public class PaymentController {
     }
 
     @GetMapping("/{paymentId}/status")
-    @PreAuthorize("hasAuthority('PAYMENT_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYMENT_READ')")
     public ResponseEntity<GatewayPaymentStatusResponse> getGatewayPaymentStatus(@PathVariable Long paymentId) {
         return ResponseEntity.ok(paymentGatewayService.getPaymentStatus(paymentId));
     }

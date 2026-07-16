@@ -24,21 +24,21 @@ public class RoleAndPermissionController {
     private final RoleAndPermissionService roleAndPermissionService;
 
     @PostMapping("/permissions")
-    @PreAuthorize("hasAuthority('PERMISSION_CREATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PERMISSION_CREATE')")
     public ResponseEntity<Permission> createPermission(@Valid @RequestBody CreatePermissionRequest request) {
         Permission permission = roleAndPermissionService.createPermission(request);
         return new ResponseEntity<>(permission, HttpStatus.CREATED);
     }
 
     @PostMapping("/roles")
-    @PreAuthorize("hasAuthority('ROLE_CREATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ROLE_CREATE')")
     public ResponseEntity<Role> createRole(@Valid @RequestBody CreateRoleRequest request) {
         Role role = roleAndPermissionService.createRole(request);
         return new ResponseEntity<>(role, HttpStatus.CREATED);
     }
 
     @PostMapping("/roles/assign-permission")
-    @PreAuthorize("hasAuthority('ROLE_PERMISSION_ASSIGN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ROLE_PERMISSION_ASSIGN')")
     public ResponseEntity<Role> assignPermissionToRole(@Valid @RequestBody AssignPermissionToRoleRequest request) {
         Role updatedRole = roleAndPermissionService.assignPermissionToRole(request);
         return ResponseEntity.ok(updatedRole);

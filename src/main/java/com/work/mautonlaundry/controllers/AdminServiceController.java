@@ -30,7 +30,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/services")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminServiceController {
     
     private final LaundryService laundryService;
@@ -41,12 +40,14 @@ public class AdminServiceController {
     private String uploadDir;
 
     @PostMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_CREATE')")
     public ResponseEntity<ServiceResponse> createService(@Valid @RequestBody CreateServiceRequest request) {
         ServiceResponse response = laundryService.createService(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_EDIT')")
     public ResponseEntity<ServiceResponse> updateService(
             @PathVariable Long id,
             @RequestBody UpdateServiceRequest request) {
@@ -55,24 +56,28 @@ public class AdminServiceController {
     }
 
     @GetMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_VIEW')")
     public ResponseEntity<List<ServiceResponse>> getAllServices() {
         List<ServiceResponse> services = laundryService.getAllServices();
         return ResponseEntity.ok(services);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_VIEW')")
     public ResponseEntity<ServiceResponse> getServiceById(@PathVariable Long id) {
         ServiceResponse service = laundryService.getServiceById(id);
         return ResponseEntity.ok(service);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_DELETE')")
     public ResponseEntity<Void> deleteService(@PathVariable Long id) {
         laundryService.deleteService(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{serviceId}/pricing")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_PRICING_CREATE')")
     public ResponseEntity<ServicePricing> createServicePricing(
             @PathVariable Long serviceId,
             @Valid @RequestBody CreateServicePricingRequest request) {
@@ -91,12 +96,14 @@ public class AdminServiceController {
     }
 
     @GetMapping("/{serviceId}/pricing")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_PRICING_VIEW')")
     public ResponseEntity<List<ServicePricing>> getServicePricing(@PathVariable Long serviceId) {
         List<ServicePricing> pricing = servicePricingRepository.findByServiceIdAndActiveTrue(serviceId);
         return ResponseEntity.ok(pricing);
     }
 
     @PutMapping("/{serviceId}/pricing/{pricingId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_PRICING_EDIT')")
     public ResponseEntity<ServicePricing> updateServicePricing(
             @PathVariable Long serviceId,
             @PathVariable Long pricingId,
@@ -122,6 +129,7 @@ public class AdminServiceController {
     }
 
     @DeleteMapping("/{serviceId}/pricing/{pricingId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_PRICING_DELETE')")
     public ResponseEntity<Void> deleteServicePricing(
             @PathVariable Long serviceId,
             @PathVariable Long pricingId) {
@@ -134,6 +142,7 @@ public class AdminServiceController {
     }
     
     @GetMapping("/images/{filename}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SERVICE_VIEW')")
     public ResponseEntity<Resource> getServiceImage(@PathVariable String filename) {
         try {
             Path filePath = Paths.get(uploadDir).resolve(filename);
