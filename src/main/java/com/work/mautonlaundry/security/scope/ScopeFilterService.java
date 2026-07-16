@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.work.mautonlaundry.data.model.Address;
 import com.work.mautonlaundry.data.model.Booking;
 import com.work.mautonlaundry.data.model.LaundrymanAssignment;
+import com.work.mautonlaundry.data.model.TemporaryScopeGrant;
 import com.work.mautonlaundry.data.model.UserScope;
 import com.work.mautonlaundry.data.model.enums.ScopeLevel;
+import com.work.mautonlaundry.data.repository.TemporaryScopeGrantRepository;
 import com.work.mautonlaundry.data.repository.UserScopeRepository;
 import com.work.mautonlaundry.security.util.SecurityUtil;
 import jakarta.persistence.criteria.CommonAbstractCriteria;
@@ -23,6 +25,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -88,10 +91,16 @@ public class ScopeFilterService {
 
     private static final Logger log = LoggerFactory.getLogger(ScopeFilterService.class);
 
+    /**
+     * Also the ceiling on how long an EXPIRED temporary upgrade can linger in a
+     * cached set (spec §6). ScopeUpgradeService invalidates on revert, so this
+     * is the backstop, not the mechanism.
+     */
     static final Duration CACHE_TTL = Duration.ofMinutes(5);
     private static final String CACHE_KEY_PREFIX = "scope:v1:";
 
     private final UserScopeRepository userScopeRepository;
+    private final TemporaryScopeGrantRepository temporaryScopeGrantRepository;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -117,6 +126,26 @@ public class ScopeFilterService {
     }
 
     private ScopeContext resolveFromDatabase(String userId) {
+        // A live temporary upgrade wins over the permanent scope (spec §6.1).
+        // This is the whole reason scope is read from the database rather than
+        // the JWT: an expiry can actually take effect.
+        Optional<TemporaryScopeGrant> upgrade =
+                temporaryScopeGrantRepository.findActiveFor(userId, LocalDateTime.now());
+        if (upgrade.isPresent()) {
+            TemporaryScopeGrant g = upgrade.get();
+            return switch (g.getTemporaryScopeLevel()) {
+                case NATIONAL -> ScopeContext.national();
+                case REGIONAL -> ScopeContext.states(ScopeLevel.REGIONAL,
+                        new HashSet<>(userScopeRepository.findStateIdsByRegionId(g.getTemporaryRegionId())));
+                case STATE -> ScopeContext.states(ScopeLevel.STATE,
+                        g.getTemporaryStateId() == null ? Set.of() : Set.of(g.getTemporaryStateId()));
+                case ZONE -> ScopeContext.zone(g.getTemporaryLgaId());
+                // V22's CHECK forbids a SPECIALIST upgrade -- nobody requests a
+                // temporary narrowing -- so this is unreachable, not a fallthrough.
+                case SPECIALIST -> ScopeContext.denyAll();
+            };
+        }
+
         Optional<UserScope> found = userScopeRepository.findById(userId);
         if (found.isEmpty()) {
             // Closed by default: no scope assigned means no data, never all data.
