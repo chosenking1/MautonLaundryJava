@@ -1,5 +1,10 @@
 -- Lightweight daily aggregation for the admin Executive Dashboard.
 -- One row per completed day, written by a scheduled midnight (Africa/Lagos) job.
+--
+-- IF NOT EXISTS for the same reason as V5: this migration never reached a
+-- deployment (a blanket *.sql gitignore excluded it), but ddl-auto=update
+-- already created the table from the entity, so a bare CREATE TABLE would fail
+-- on first run and refuse to start the app.
 -- Today's metrics are still computed live from transactional tables; historical
 -- trend metrics (month/year totals, growth rates) read from this table. This is
 -- sufficient for launch volumes and avoids materialized-view infrastructure.
@@ -13,7 +18,7 @@
 --   returning_customers  distinct customers who ordered that day and had ordered before (gauge)
 --   average_order_value  total_revenue / total_orders (0 when no orders)
 
-CREATE TABLE analytics_daily_snapshot (
+CREATE TABLE IF NOT EXISTS analytics_daily_snapshot (
     snapshot_date        DATE PRIMARY KEY,
     total_revenue        NUMERIC(14,2) NOT NULL DEFAULT 0,
     platform_earnings    NUMERIC(14,2) NOT NULL DEFAULT 0,

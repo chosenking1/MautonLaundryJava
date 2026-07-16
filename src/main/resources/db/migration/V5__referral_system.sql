@@ -1,6 +1,15 @@
 -- Referral system: a standalone partner-referral and commission engine,
 -- separate from (but optionally linked to) the discount system.
 --
+-- WHY IF NOT EXISTS: this migration was never committed (a blanket *.sql
+-- gitignore excluded it) and so has never run in any environment -- yet the
+-- tables it creates already exist everywhere, because ddl-auto=update built them
+-- from the entities. A bare CREATE TABLE would therefore fail on its very first
+-- run, failing Flyway and refusing to start the app. Guarding each object lets
+-- the migration reconcile with what ddl-auto already made instead of colliding
+-- with it. Safe to relax the guards only once every environment's
+-- flyway_schema_history records V5.
+--
 -- Design notes:
 --  * referrers has NO foreign key to users. Referrers (specialists,
 --    influencers, estate managers, ...) are managed entirely from the admin
@@ -13,7 +22,7 @@
 --    Imototo commission rate that rule Type 1 pays out of is seeded into the
 --    existing pricing_config table and is admin-editable.
 
-CREATE TABLE referrers (
+CREATE TABLE IF NOT EXISTS referrers (
     id                   VARCHAR(36) PRIMARY KEY,
     name                 VARCHAR(150) NOT NULL,
     email                VARCHAR(150),
@@ -29,10 +38,10 @@ CREATE TABLE referrers (
     ))
 );
 
-CREATE INDEX idx_referrers_email ON referrers(LOWER(email)) WHERE email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_referrers_email ON referrers(LOWER(email)) WHERE email IS NOT NULL;
 
 
-CREATE TABLE referral_attributions (
+CREATE TABLE IF NOT EXISTS referral_attributions (
     id                   VARCHAR(36) PRIMARY KEY,
     referrer_id          VARCHAR(36) NOT NULL REFERENCES referrers(id),
     user_id              VARCHAR(36) NOT NULL UNIQUE REFERENCES users(id),
@@ -40,10 +49,10 @@ CREATE TABLE referral_attributions (
     referral_code_used   VARCHAR(50)
 );
 
-CREATE INDEX idx_attributions_referrer ON referral_attributions(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_attributions_referrer ON referral_attributions(referrer_id);
 
 
-CREATE TABLE referral_payment_rules (
+CREATE TABLE IF NOT EXISTS referral_payment_rules (
     id                            VARCHAR(36) PRIMARY KEY,
     referrer_id                   VARCHAR(36) NOT NULL REFERENCES referrers(id),
     rule_type                     VARCHAR(40) NOT NULL,
@@ -74,10 +83,10 @@ CREATE TABLE referral_payment_rules (
     ))
 );
 
-CREATE INDEX idx_rules_referrer_active ON referral_payment_rules(referrer_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_rules_referrer_active ON referral_payment_rules(referrer_id, is_active);
 
 
-CREATE TABLE referral_booking_events (
+CREATE TABLE IF NOT EXISTS referral_booking_events (
     id                            VARCHAR(36) PRIMARY KEY,
     attribution_id                VARCHAR(36) NOT NULL REFERENCES referral_attributions(id),
     booking_id                    VARCHAR(36) NOT NULL UNIQUE REFERENCES bookings(id),
@@ -90,11 +99,11 @@ CREATE TABLE referral_booking_events (
     created_at                    TIMESTAMP   NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_events_attribution ON referral_booking_events(attribution_id);
-CREATE INDEX idx_events_created_at ON referral_booking_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_events_attribution ON referral_booking_events(attribution_id);
+CREATE INDEX IF NOT EXISTS idx_events_created_at ON referral_booking_events(created_at);
 
 
-CREATE TABLE referral_payment_rule_history (
+CREATE TABLE IF NOT EXISTS referral_payment_rule_history (
     id              VARCHAR(36) PRIMARY KEY,
     referrer_id     VARCHAR(36) NOT NULL REFERENCES referrers(id),
     changed_by      VARCHAR(36),
@@ -104,10 +113,10 @@ CREATE TABLE referral_payment_rule_history (
     change_reason   TEXT
 );
 
-CREATE INDEX idx_rule_history_referrer ON referral_payment_rule_history(referrer_id, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_rule_history_referrer ON referral_payment_rule_history(referrer_id, changed_at DESC);
 
 
-CREATE TABLE referral_payouts (
+CREATE TABLE IF NOT EXISTS referral_payouts (
     id                          VARCHAR(36) PRIMARY KEY,
     referrer_id                 VARCHAR(36) NOT NULL REFERENCES referrers(id),
     period_from                 DATE,
@@ -131,8 +140,8 @@ CREATE TABLE referral_payouts (
     ))
 );
 
-CREATE INDEX idx_payouts_referrer ON referral_payouts(referrer_id, generated_at DESC);
-CREATE INDEX idx_payouts_status ON referral_payouts(status);
+CREATE INDEX IF NOT EXISTS idx_payouts_referrer ON referral_payouts(referrer_id, generated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payouts_status ON referral_payouts(status);
 
 
 -- Imototo's commission rate: the share of the laundry/service revenue (items
