@@ -6,12 +6,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface LgaRepository extends JpaRepository<Lga, Integer> {
 
     Optional<Lga> findByStateIdAndNormalizedName(Integer stateId, String normalizedName);
+
+    /** The zones (LGAs) of one state, for the Zone Management screen. */
+    List<Lga> findByStateIdOrderByName(Integer stateId);
 
     /**
      * Resolves an external LGA name to a canonical lgas.id, within a known state.
