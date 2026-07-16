@@ -45,8 +45,8 @@ public class ScopeUpgradeRequest {
     @Column(name = "requested_state_id")
     private Integer requestedStateId;
 
-    @Column(name = "requested_lga_id")
-    private Integer requestedLgaId;
+    @Column(name = "requested_zone_id")
+    private String requestedZoneId;
 
     @Column(columnDefinition = "TEXT")
     private String reason;

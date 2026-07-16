@@ -19,8 +19,13 @@ public record ScopeContext(
         ScopeLevel level,
         /** Populated for REGIONAL (member states) and STATE (one). */
         Set<Integer> stateIds,
-        /** Populated for ZONE. */
-        Integer lgaId,
+        /**
+         * Populated for ZONE: the LGAs of the operational zone. A zone is one or
+         * more LGAs grouped together (an LGA may be a standalone zone), so like
+         * REGIONAL this reduces to "lga in this set" -- a single-LGA zone is just
+         * a set of one.
+         */
+        Set<Integer> lgaIds,
         /** Populated for SPECIALIST. */
         String specialistUserId,
         /** True when the user has no scope assigned: see nothing. */
@@ -28,7 +33,7 @@ public record ScopeContext(
 ) {
 
     public static ScopeContext national() {
-        return new ScopeContext(ScopeLevel.NATIONAL, Set.of(), null, null, false);
+        return new ScopeContext(ScopeLevel.NATIONAL, Set.of(), Set.of(), null, false);
     }
 
     public static ScopeContext states(ScopeLevel level, Set<Integer> stateIds) {
@@ -37,26 +42,27 @@ public record ScopeContext(
         if (stateIds == null || stateIds.isEmpty()) {
             return denyAll();
         }
-        return new ScopeContext(level, Set.copyOf(stateIds), null, null, false);
+        return new ScopeContext(level, Set.copyOf(stateIds), Set.of(), null, false);
     }
 
-    public static ScopeContext zone(Integer lgaId) {
-        if (lgaId == null) {
+    public static ScopeContext zone(Set<Integer> lgaIds) {
+        // A zone with no LGAs would become an unrestricted "IN ()" -- deny.
+        if (lgaIds == null || lgaIds.isEmpty()) {
             return denyAll();
         }
-        return new ScopeContext(ScopeLevel.ZONE, Set.of(), lgaId, null, false);
+        return new ScopeContext(ScopeLevel.ZONE, Set.of(), Set.copyOf(lgaIds), null, false);
     }
 
     public static ScopeContext specialist(String specialistUserId) {
         if (specialistUserId == null || specialistUserId.isBlank()) {
             return denyAll();
         }
-        return new ScopeContext(ScopeLevel.SPECIALIST, Set.of(), null, specialistUserId, false);
+        return new ScopeContext(ScopeLevel.SPECIALIST, Set.of(), Set.of(), specialistUserId, false);
     }
 
     /** No scope assigned, or an unresolvable one: sees nothing. */
     public static ScopeContext denyAll() {
-        return new ScopeContext(null, Set.of(), null, null, true);
+        return new ScopeContext(null, Set.of(), Set.of(), null, true);
     }
 
     /** True when the scope imposes no restriction at all. */

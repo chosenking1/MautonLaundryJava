@@ -80,7 +80,7 @@ public class AccessControlController {
     @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SCOPE_ASSIGN')")
     public ResponseEntity<Void> assignScope(@PathVariable String userId, @RequestBody ScopeRequest request) {
         userAccessService.assignScope(userId, request.level, request.regionId, request.stateId,
-                request.lgaId, request.specialistUserId, SecurityUtil.getCurrentUserId());
+                request.zoneId, request.specialistUserId, SecurityUtil.getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
 
@@ -122,7 +122,7 @@ public class AccessControlController {
         public ScopeLevel level;
         public String regionId;
         public Integer stateId;
-        public Integer lgaId;
+        public String zoneId;
         public String specialistUserId;
     }
 }

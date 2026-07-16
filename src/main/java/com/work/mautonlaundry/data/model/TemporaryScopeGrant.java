@@ -42,8 +42,8 @@ public class TemporaryScopeGrant {
     @Column(name = "temporary_state_id")
     private Integer temporaryStateId;
 
-    @Column(name = "temporary_lga_id")
-    private Integer temporaryLgaId;
+    @Column(name = "temporary_zone_id")
+    private String temporaryZoneId;
 
     @Column(name = "granted_by", nullable = false)
     private String grantedBy;

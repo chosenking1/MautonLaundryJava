@@ -1,56 +1,77 @@
 package com.work.mautonlaundry.controllers;
 
-import com.work.mautonlaundry.data.model.Lga;
 import com.work.mautonlaundry.data.model.State;
+import com.work.mautonlaundry.data.model.Zone;
 import com.work.mautonlaundry.data.repository.LgaRepository;
 import com.work.mautonlaundry.data.repository.StateRepository;
+import com.work.mautonlaundry.data.repository.ZoneRepository;
+import com.work.mautonlaundry.security.util.SecurityUtil;
 import com.work.mautonlaundry.services.geo.GeoNormalizer;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * Zone (LGA) management within a state (Permission Architecture V2, §5).
+ * Zone management (Permission Architecture V2, §5 — the ZONE scope level).
  *
- * <p>ZONE is the LGA scope level. The 774 official LGAs are seeded in V14, but a
- * business may want operational zones the official register does not have -- a
- * large LGA split into delivery areas, say -- so this lets an admin add zones to
- * a state. A zone belongs to exactly one state (set at creation, via the
- * lgas.state_id column), so unlike a region there is nothing to assign
- * afterwards; creating it under the state is the whole operation.
+ * <p>A zone is an operational unit made of one or more LGAs within a state. An
+ * LGA belongs to at most one zone; a zone may be a single LGA or several joined.
+ * So a small state might run three zones, a dense one like Lagos twenty-one.
  *
- * <p>Reuses REGION_VIEW / REGION_MANAGE rather than minting a fourth geo
- * permission. Regions, states and zones are one map that one role edits;
- * splitting "manage regions" from "manage zones" would fragment a single
- * capability without giving anyone a reason to hold one but not the other.
+ * <p>Exactly parallel to regions, one level down: a region groups states, a zone
+ * groups LGAs. Reuses REGION_VIEW / REGION_MANAGE -- managing the geographic map
+ * is one capability, and splitting "manage regions" from "manage zones" would
+ * fragment it for no one's benefit.
  *
- * <p>Resolver note: a created zone whose normalized name Google never returns
- * simply will not auto-resolve from an address's coordinates -- which is
- * harmless, since resolution failing leaves the zone unset rather than wrong. It
- * is still fully usable as a ZONE scope target and can be set on an address
- * manually or via an lga_aliases entry.
+ * <p>An LGA lives in at most one zone (V24's unique index), so the LGA palette
+ * reports each LGA's current zone and adding one that is already placed is
+ * skipped -- a move is a deliberate remove-then-add.
  */
 @RestController
 @RequestMapping("/api/v1/admin/zones")
 @RequiredArgsConstructor
 public class ZoneController {
 
+    private final ZoneRepository zoneRepository;
     private final LgaRepository lgaRepository;
     private final StateRepository stateRepository;
 
-    /** The zones of a state. */
+    /** Zones of a state, each with its LGA ids. */
     @GetMapping
     @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REGION_VIEW')")
     public ResponseEntity<List<Map<String, Object>>> byState(@RequestParam Integer stateId) {
+        return ResponseEntity.ok(zoneRepository.findByStateIdOrderByName(stateId).stream()
+                .map(z -> Map.<String, Object>of(
+                        "id", z.getId(),
+                        "name", z.getName(),
+                        "lgaIds", zoneRepository.findLgaIds(z.getId())))
+                .toList());
+    }
+
+    /**
+     * Every LGA of a state with the zone it currently belongs to (null if none) --
+     * the builder's palette. Reporting the current zone keeps a move deliberate.
+     */
+    @GetMapping("/lgas")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REGION_VIEW')")
+    public ResponseEntity<List<Map<String, Object>>> lgas(@RequestParam Integer stateId) {
         return ResponseEntity.ok(lgaRepository.findByStateIdOrderByName(stateId).stream()
-                .map(l -> Map.<String, Object>of("id", l.getId(), "name", l.getName()))
+                .map(l -> {
+                    Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("id", l.getId());
+                    m.put("name", l.getName());
+                    m.put("zoneId", zoneRepository.findZoneOfLga(l.getId()).orElse(null));
+                    return m;
+                })
                 .toList());
     }
 
@@ -61,26 +82,40 @@ public class ZoneController {
         if (state == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Unknown state."));
         }
-
-        // Normalize with the same routine the resolver uses, so the uniqueness
-        // check matches how a future Google-resolved name would be compared.
-        String normalized = GeoNormalizer.normalizeLga(request.name);
+        String normalized = GeoNormalizer.normalize(request.name);
         if (normalized.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "A zone needs a name."));
         }
-        if (lgaRepository.findByStateIdAndNormalizedName(request.stateId, normalized).isPresent()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "That state already has a zone by that name."));
+        if (zoneRepository.findByStateIdAndNormalizedName(request.stateId, normalized).isPresent()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "That state already has a zone by that name."));
         }
 
-        Lga lga = new Lga();
-        lga.setState(state);
-        lga.setName(request.name.trim());
-        lga.setNormalizedName(normalized);
-        lga.setCreatedAt(LocalDateTime.now());
-        Lga saved = lgaRepository.save(lga);
+        Zone zone = new Zone();
+        zone.setId(UUID.randomUUID().toString());
+        zone.setState(state);
+        zone.setName(request.name.trim());
+        zone.setNormalizedName(normalized);
+        zone.setCreatedBy(SecurityUtil.getCurrentUserId());
+        zone.setCreatedAt(LocalDateTime.now());
+        zoneRepository.save(zone);
+        return ResponseEntity.ok(Map.of("id", zone.getId(), "name", zone.getName()));
+    }
 
-        return ResponseEntity.ok(Map.of("id", saved.getId(), "name", saved.getName()));
+    /** Adds an LGA to a zone. Skipped if the LGA is already in one (V24). */
+    @PostMapping("/{zoneId}/lgas/{lgaId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REGION_MANAGE')")
+    @Transactional
+    public ResponseEntity<Void> addLga(@PathVariable String zoneId, @PathVariable Integer lgaId) {
+        zoneRepository.addLga(zoneId, lgaId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{zoneId}/lgas/{lgaId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REGION_MANAGE')")
+    @Transactional
+    public ResponseEntity<Void> removeLga(@PathVariable String zoneId, @PathVariable Integer lgaId) {
+        zoneRepository.removeLga(zoneId, lgaId);
+        return ResponseEntity.noContent().build();
     }
 
     public static class CreateZoneRequest {

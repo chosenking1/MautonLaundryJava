@@ -241,7 +241,7 @@ public class UserAccessService {
      */
     @Transactional
     public void assignScope(String userId, ScopeLevel level, String regionId, Integer stateId,
-                            Integer lgaId, String specialistUserId, String actorId) {
+                            String zoneId, String specialistUserId, String actorId) {
         Optional<UserScope> before = userScopeRepository.findById(userId);
         // Snapshot the before-state NOW. orElseGet returns the very object about
         // to be mutated below, so reading it after would record old == new and
@@ -255,13 +255,13 @@ public class UserAccessService {
         // the old state_id behind, which the CHECK would then reject.
         scope.setRegionId(null);
         scope.setStateId(null);
-        scope.setLgaId(null);
+        scope.setZoneId(null);
         scope.setSpecialistUserId(null);
         switch (level) {
             case NATIONAL -> { }
             case REGIONAL -> scope.setRegionId(regionId);
             case STATE -> scope.setStateId(stateId);
-            case ZONE -> scope.setLgaId(lgaId);
+            case ZONE -> scope.setZoneId(zoneId);
             case SPECIALIST -> scope.setSpecialistUserId(specialistUserId);
         }
         scope.setAssignedBy(actorId);
@@ -307,7 +307,7 @@ public class UserAccessService {
         m.put("scopeLevel", String.valueOf(s.getScopeLevel()));
         if (s.getRegionId() != null) m.put("regionId", s.getRegionId());
         if (s.getStateId() != null) m.put("stateId", s.getStateId());
-        if (s.getLgaId() != null) m.put("lgaId", s.getLgaId());
+        if (s.getZoneId() != null) m.put("zoneId", s.getZoneId());
         if (s.getSpecialistUserId() != null) m.put("specialistUserId", s.getSpecialistUserId());
         return m;
     }

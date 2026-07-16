@@ -42,9 +42,9 @@ public class UserScope {
     @Column(name = "state_id")
     private Integer stateId;
 
-    /** Set only for ZONE (an LGA). */
-    @Column(name = "lga_id")
-    private Integer lgaId;
+    /** Set only for ZONE (an operational zone: a group of LGAs). */
+    @Column(name = "zone_id")
+    private String zoneId;
 
     /** Set only for SPECIALIST -- the user whose own work is visible. */
     @Column(name = "specialist_user_id")

@@ -8,6 +8,7 @@ import com.work.mautonlaundry.data.model.TemporaryScopeGrant;
 import com.work.mautonlaundry.data.model.UserScope;
 import com.work.mautonlaundry.data.model.enums.ScopeLevel;
 import com.work.mautonlaundry.data.repository.TemporaryScopeGrantRepository;
+import com.work.mautonlaundry.data.repository.ZoneRepository;
 import com.work.mautonlaundry.data.repository.UserScopeRepository;
 import com.work.mautonlaundry.security.util.SecurityUtil;
 import jakarta.persistence.criteria.CommonAbstractCriteria;
@@ -101,6 +102,7 @@ public class ScopeFilterService {
 
     private final UserScopeRepository userScopeRepository;
     private final TemporaryScopeGrantRepository temporaryScopeGrantRepository;
+    private final ZoneRepository zoneRepository;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -139,7 +141,8 @@ public class ScopeFilterService {
                         new HashSet<>(userScopeRepository.findStateIdsByRegionId(g.getTemporaryRegionId())));
                 case STATE -> ScopeContext.states(ScopeLevel.STATE,
                         g.getTemporaryStateId() == null ? Set.of() : Set.of(g.getTemporaryStateId()));
-                case ZONE -> ScopeContext.zone(g.getTemporaryLgaId());
+                case ZONE -> ScopeContext.zone(
+                        new HashSet<>(zoneRepository.findLgaIds(g.getTemporaryZoneId())));
                 // V22's CHECK forbids a SPECIALIST upgrade -- nobody requests a
                 // temporary narrowing -- so this is unreachable, not a fallthrough.
                 case SPECIALIST -> ScopeContext.denyAll();
@@ -166,7 +169,8 @@ public class ScopeFilterService {
             case STATE -> ScopeContext.states(
                     scope.getScopeLevel(),
                     scope.getStateId() == null ? Set.of() : Set.of(scope.getStateId()));
-            case ZONE -> ScopeContext.zone(scope.getLgaId());
+            case ZONE -> ScopeContext.zone(
+                    new HashSet<>(zoneRepository.findLgaIds(scope.getZoneId())));
             case SPECIALIST -> ScopeContext.specialist(scope.getSpecialistUserId());
         };
     }
@@ -271,8 +275,9 @@ public class ScopeFilterService {
         // must be excluded, not silently matched.
         Join<Booking, Address> address = root.join("pickupAddress", JoinType.LEFT);
 
-        if (scope.lgaId() != null) {
-            return cb.equal(address.get("lgaId"), scope.lgaId());
+        if (!scope.lgaIds().isEmpty()) {
+            // A zone is a set of LGAs; filter to any of them.
+            return address.get("lgaId").in(scope.lgaIds());
         }
         if (!scope.stateIds().isEmpty()) {
             return address.get("stateId").in(scope.stateIds());
@@ -290,8 +295,8 @@ public class ScopeFilterService {
             // own.
             return cb.equal(root.get("user").get("id"), scope.specialistUserId());
         }
-        if (scope.lgaId() != null) {
-            return cb.equal(root.get("lgaId"), scope.lgaId());
+        if (!scope.lgaIds().isEmpty()) {
+            return root.get("lgaId").in(scope.lgaIds());
         }
         if (!scope.stateIds().isEmpty()) {
             return root.get("stateId").in(scope.stateIds());

@@ -2,10 +2,12 @@ package com.work.mautonlaundry.services;
 
 import com.work.mautonlaundry.data.model.ScopeUpgradeRequest;
 import com.work.mautonlaundry.data.model.TemporaryScopeGrant;
+import com.work.mautonlaundry.data.model.Zone;
 import com.work.mautonlaundry.data.model.enums.ScopeLevel;
 import com.work.mautonlaundry.data.model.enums.ScopeUpgradeStatus;
 import com.work.mautonlaundry.data.repository.ScopeUpgradeRequestRepository;
 import com.work.mautonlaundry.data.repository.TemporaryScopeGrantRepository;
+import com.work.mautonlaundry.data.repository.ZoneRepository;
 import com.work.mautonlaundry.security.scope.ScopeContext;
 import com.work.mautonlaundry.security.scope.ScopeFilterService;
 import lombok.RequiredArgsConstructor;
@@ -61,12 +63,13 @@ public class ScopeUpgradeService {
     private final ScopeUpgradeRequestRepository requestRepository;
     private final TemporaryScopeGrantRepository grantRepository;
     private final ScopeFilterService scopeFilterService;
+    private final ZoneRepository zoneRepository;
     private final AuditService auditService;
 
     /** §6.1: any user may ask. Whether anyone can approve is a separate matter. */
     @Transactional
     public ScopeUpgradeRequest requestUpgrade(String requesterId, ScopeLevel level, String regionId,
-                                              Integer stateId, Integer lgaId, String reason) {
+                                              Integer stateId, String zoneId, String reason) {
         ScopeContext current = scopeFilterService.scopeFor(requesterId);
 
         ScopeUpgradeRequest request = new ScopeUpgradeRequest();
@@ -79,7 +82,7 @@ public class ScopeUpgradeService {
         request.setRequestedScopeLevel(level);
         request.setRequestedRegionId(regionId);
         request.setRequestedStateId(stateId);
-        request.setRequestedLgaId(lgaId);
+        request.setRequestedZoneId(zoneId);
         request.setReason(reason);
         request.setStatus(ScopeUpgradeStatus.PENDING);
         request.setRequestedAt(LocalDateTime.now());
@@ -121,7 +124,7 @@ public class ScopeUpgradeService {
         grant.setTemporaryScopeLevel(request.getRequestedScopeLevel());
         grant.setTemporaryRegionId(request.getRequestedRegionId());
         grant.setTemporaryStateId(request.getRequestedStateId());
-        grant.setTemporaryLgaId(request.getRequestedLgaId());
+        grant.setTemporaryZoneId(request.getRequestedZoneId());
         grant.setGrantedBy(approverId);
         grant.setGrantedAt(LocalDateTime.now());
         grant.setExpiresAt(expiry);
@@ -210,9 +213,10 @@ public class ScopeUpgradeService {
             case REGIONAL -> false;   // a region spans states the approver would need to already hold
             case STATE -> request.getRequestedStateId() != null
                     && approver.stateIds().contains(request.getRequestedStateId());
-            // Approving a ZONE upgrade needs sight of that LGA, which a
-            // state-scoped approver has and a differently-zoned one does not.
-            case ZONE -> approver.lgaId() != null && approver.lgaId().equals(request.getRequestedLgaId());
+            // A zone is a set of LGAs. The approver covers it if they can already
+            // see all of it: a state-scoped approver whose state contains the
+            // zone, or a zone-scoped approver whose own LGA set is a superset.
+            case ZONE -> approverCoversZone(approver, request.getRequestedZoneId());
             case SPECIALIST -> false;
         };
         if (!covers) {
@@ -220,6 +224,28 @@ public class ScopeUpgradeService {
                     "You cannot approve this: your own scope does not cover "
                             + request.getRequestedScopeLevel() + " for that area.");
         }
+    }
+
+    /**
+     * True when the approver can already see the whole of the requested zone.
+     *
+     * <p>Either their scope covers the zone's state (a state head can approve any
+     * zone within their state), or -- for a zone-scoped approver -- their own LGA
+     * set contains every LGA of the requested zone.
+     */
+    private boolean approverCoversZone(ScopeContext approver, String requestedZoneId) {
+        if (requestedZoneId == null) {
+            return false;
+        }
+        Zone zone = zoneRepository.findById(requestedZoneId).orElse(null);
+        if (zone == null) {
+            return false;
+        }
+        if (approver.stateIds().contains(zone.getState().getId())) {
+            return true;
+        }
+        List<Integer> zoneLgas = zoneRepository.findLgaIds(requestedZoneId);
+        return !zoneLgas.isEmpty() && approver.lgaIds().containsAll(zoneLgas);
     }
 
     private ScopeUpgradeRequest requirePending(String requestId) {
@@ -233,7 +259,7 @@ public class ScopeUpgradeService {
 
     private static String describeCurrent(ScopeContext c) {
         if (c.denied()) return null;
-        if (c.lgaId() != null) return "lga:" + c.lgaId();
+        if (!c.lgaIds().isEmpty()) return "zone-lgas:" + c.lgaIds();
         if (!c.stateIds().isEmpty()) return "states:" + c.stateIds();
         return null;
     }

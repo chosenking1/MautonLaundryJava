@@ -36,7 +36,7 @@ public class ScopeUpgradeController {
     @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('SCOPE_UPGRADE_REQUEST')")
     public ResponseEntity<Map<String, Object>> request(@RequestBody UpgradeRequest body) {
         ScopeUpgradeRequest created = scopeUpgradeService.requestUpgrade(
-                SecurityUtil.getCurrentUserId(), body.level, body.regionId, body.stateId, body.lgaId, body.reason);
+                SecurityUtil.getCurrentUserId(), body.level, body.regionId, body.stateId, body.zoneId, body.reason);
         return ResponseEntity.ok(Map.of("id", created.getId(), "status", String.valueOf(created.getStatus())));
     }
 
@@ -86,7 +86,7 @@ public class ScopeUpgradeController {
         m.put("currentScope", r.getCurrentScopeLevel());
         m.put("requestedLevel", String.valueOf(r.getRequestedScopeLevel()));
         m.put("requestedStateId", r.getRequestedStateId());
-        m.put("requestedLgaId", r.getRequestedLgaId());
+        m.put("requestedZoneId", r.getRequestedZoneId());
         m.put("reason", r.getReason());
         m.put("status", String.valueOf(r.getStatus()));
         m.put("expiry", String.valueOf(r.getExpiry()));
@@ -98,7 +98,7 @@ public class ScopeUpgradeController {
         public ScopeLevel level;
         public String regionId;
         public Integer stateId;
-        public Integer lgaId;
+        public String zoneId;
         public String reason;
     }
 
