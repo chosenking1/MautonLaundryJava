@@ -25,6 +25,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Bandwidth AUTH_LIMIT = Bandwidth.classic(10, Refill.greedy(10, Duration.ofMinutes(1)));
     private static final Bandwidth DISCOUNT_CHECK_LIMIT = Bandwidth.classic(20, Refill.greedy(20, Duration.ofMinutes(1)));
+    /**
+     * Every Google proxy route (/places, /maps) is billed per request against
+     * our key, so they are capped well below DEFAULT_LIMIT. 30/min still allows
+     * comfortable type-ahead (the clients debounce) and periodic ETA refreshes,
+     * while bounding what a runaway loop or a stolen session can spend. This is
+     * a cost control, not just an abuse control.
+     */
+    private static final Bandwidth GOOGLE_PROXY_LIMIT = Bandwidth.classic(30, Refill.greedy(30, Duration.ofMinutes(1)));
     private static final Bandwidth DEFAULT_LIMIT = Bandwidth.classic(100, Refill.greedy(100, Duration.ofMinutes(1)));
 
     private static final long MAX_BUCKET_ENTRIES = 10000;
@@ -87,7 +95,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/v1/discounts/check")) {
             return DISCOUNT_CHECK_LIMIT;
         }
+        if (isGoogleProxy(path)) {
+            return GOOGLE_PROXY_LIMIT;
+        }
         return DEFAULT_LIMIT;
+    }
+
+    /** Routes that spend money on our Google key: Places, Directions, Geocoding. */
+    private boolean isGoogleProxy(String path) {
+        return path.startsWith("/api/v1/places") || path.startsWith("/api/v1/maps");
     }
 
     private String resolveBucketScope(String path) {
@@ -96,6 +112,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         if (path.startsWith("/api/v1/discounts/check")) {
             return "discount-check";
+        }
+        if (isGoogleProxy(path)) {
+            return "google-proxy";
         }
         return "default";
     }
