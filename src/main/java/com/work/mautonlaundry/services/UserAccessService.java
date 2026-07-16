@@ -1,9 +1,11 @@
 package com.work.mautonlaundry.services;
 
+import com.work.mautonlaundry.data.model.PendingPermissionReview;
 import com.work.mautonlaundry.data.model.Permission;
 import com.work.mautonlaundry.data.model.UserScope;
 import com.work.mautonlaundry.data.model.enums.GrantType;
 import com.work.mautonlaundry.data.model.enums.ScopeLevel;
+import com.work.mautonlaundry.data.repository.PendingPermissionReviewRepository;
 import com.work.mautonlaundry.data.repository.PermissionRepository;
 import com.work.mautonlaundry.data.repository.UserPermissionRepository;
 import com.work.mautonlaundry.data.repository.UserScopeRepository;
@@ -44,12 +46,11 @@ import java.util.UUID;
  * remove it would make an over-granted permission impossible to claw back by
  * exactly the people most likely to notice.
  *
- * <h2>Not yet: pending_permission_review</h2>
- * Spec §2.1 says reducing someone's permissions should flag the grants they
- * previously made that now exceed their own set, for human review rather than
- * auto-revocation. The table exists (V10); nothing writes it yet. Left
- * deliberately, because auto-revoking would be the wrong fix and a half-built
- * flagging path is worse than none.
+ * <h2>Reducing someone has consequences for others</h2>
+ * Spec §2.1: when a person's permissions shrink, the grants they previously made
+ * may now exceed what they hold. Those are flagged for human review, never
+ * auto-revoked -- the recipient may depend on the permission to do their job, and
+ * the grantor losing it says nothing about whether the recipient should keep it.
  */
 @Service
 @RequiredArgsConstructor
@@ -60,6 +61,7 @@ public class UserAccessService {
     private final UserPermissionRepository userPermissionRepository;
     private final UserScopeRepository userScopeRepository;
     private final PermissionRepository permissionRepository;
+    private final PendingPermissionReviewRepository pendingReviewRepository;
     private final PermissionEvaluationService permissionEvaluationService;
     private final ScopeFilterService scopeFilterService;
     private final AuditService auditService;
@@ -129,6 +131,9 @@ public class UserAccessService {
     @Transactional
     public void deny(String userId, Long permissionId, String actorId) {
         upsert(userId, require(permissionId), GrantType.DENY, actorId);
+        // The denied user's own set just shrank, so anything they granted may now
+        // exceed it (spec §2.1).
+        flagGrantsNowExceeding(userId);
     }
 
     /**
@@ -148,6 +153,83 @@ public class UserAccessService {
         auditService.logChange("PERMISSION_REVOKE", "USER_PERMISSION", userId,
                 Map.of("permission", permission.getName(), "grantType", existing.get()), null);
         log.info("{} revoked individual {} from {}", actorId, permission.getName(), userId);
+
+        flagGrantsNowExceeding(userId);
+    }
+
+    /**
+     * Flags the grants this person made that they could no longer make
+     * themselves (spec §2.1).
+     *
+     * <p>Called after their own permissions shrink. Nothing is revoked: §2.1 is
+     * explicit that "they are NOT auto-revoked -- a human must review and confirm
+     * or revoke them". That restraint matters -- the recipient may depend on the
+     * permission to do their job, and the grantor losing it says nothing about
+     * whether the recipient should keep it. Auto-revoking would turn one
+     * personnel change into an outage for everyone they ever onboarded.
+     *
+     * <p>Their permissions were invalidated moments ago, so this reads the new
+     * set, not the old one.
+     */
+    private void flagGrantsNowExceeding(String grantorId) {
+        Set<String> stillHeld = permissionEvaluationService.getEffectivePermissions(grantorId);
+
+        for (Object[] row : pendingReviewRepository.findGrantsMadeBy(grantorId)) {
+            String recipientId = (String) row[0];
+            Long permissionId = ((Number) row[1]).longValue();
+
+            permissionRepository.findById(permissionId).ifPresent(granted -> {
+                if (stillHeld.contains(granted.getName())) {
+                    return;   // they can still make this grant; nothing to review
+                }
+                // Idempotent: reducing someone twice must not queue the same
+                // grant twice for the same reviewer.
+                if (pendingReviewRepository.countOpen(recipientId, permissionId, grantorId) > 0) {
+                    return;
+                }
+                PendingPermissionReview review = new PendingPermissionReview();
+                review.setId(UUID.randomUUID().toString());
+                review.setUserId(recipientId);
+                review.setPermissionId(permissionId);
+                review.setOriginalGrantorId(grantorId);
+                review.setFlaggedAt(LocalDateTime.now());
+                pendingReviewRepository.save(review);
+
+                log.info("Flagged for review: {} holds {} granted by {}, who no longer holds it",
+                        recipientId, granted.getName(), grantorId);
+            });
+        }
+    }
+
+    /**
+     * Resolves a flagged grant (spec §2.1: "confirm or revoke").
+     *
+     * @param keep true to leave the recipient's grant in place; false to remove it
+     */
+    @Transactional
+    public void resolveReview(String reviewId, boolean keep, String reviewerId) {
+        PendingPermissionReview review = pendingReviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("Review not found: " + reviewId));
+        if (review.getReviewedAt() != null) {
+            throw new IllegalArgumentException("This review is already resolved.");
+        }
+
+        review.setReviewedBy(reviewerId);
+        review.setReviewedAt(LocalDateTime.now());
+        review.setResolution(keep ? "KEPT" : "REVOKED");
+        pendingReviewRepository.save(review);
+
+        if (!keep) {
+            // Deliberately not revoke(): that would re-run the flagging pass for
+            // the recipient, which is a different question from this one.
+            userPermissionRepository.deleteFor(review.getUserId(), review.getPermissionId());
+            permissionEvaluationService.invalidate(review.getUserId());
+        }
+
+        auditService.logChange("PERMISSION_REVIEW_RESOLVE", "USER_PERMISSION", review.getUserId(),
+                Map.of("flaggedGrantor", review.getOriginalGrantorId()),
+                Map.of("resolution", keep ? "KEPT" : "REVOKED", "reviewedBy", reviewerId));
+        log.info("{} resolved review {} as {}", reviewerId, reviewId, keep ? "KEPT" : "REVOKED");
     }
 
     /**
