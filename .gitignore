@@ -36,7 +36,14 @@ build/
 *.docx
 *.md
 *.db
+# Keeps local dumps and scratch queries out of the repo...
 *.sql
+# ...but Flyway migrations are source, not data. Without this exception the
+# blanket *.sql above silently excluded V5 onwards: they lived only on one
+# laptop and never deployed, so their DROPs never ran anywhere (ddl-auto=update
+# creates tables from entities, which masked the missing CREATEs but can never
+# perform a drop).
+!src/main/resources/db/migration/*.sql
 .DS_Store
 .env
 .env.*
