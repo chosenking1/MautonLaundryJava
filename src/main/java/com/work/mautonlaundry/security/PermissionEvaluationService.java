@@ -39,9 +39,12 @@ import java.util.Set;
  * leak into an unrelated role grant. §8.1's reading is implemented here: an
  * exclusion only constrains the module assignment it hangs off.
  *
- * <p><b>Nothing calls this yet.</b> It is built and tested alongside the live
- * permission path; the 66 existing {@code @PreAuthorize} annotations still
- * decide access until the cutover step.
+ * <p>This is the live permission path: every {@code @PreAuthorize} annotation
+ * routes through {@link #currentUserHasPermission}, and {@code /me} returns the
+ * effective set so the admin portal can gate by permission. Because it sits in
+ * front of both enforcement and a startup-critical endpoint, a resolution
+ * failure degrades closed rather than propagating (see {@link
+ * #getEffectivePermissions}).
  */
 @Service
 @RequiredArgsConstructor
@@ -81,7 +84,21 @@ public class PermissionEvaluationService {
             return cached;
         }
 
-        Set<String> effective = resolveFromDatabase(userId);
+        Set<String> effective;
+        try {
+            effective = resolveFromDatabase(userId);
+        } catch (Exception e) {
+            // Resolving permissions must never crash the caller. This method is
+            // on the /me enrichment path AND behind every @PreAuthorize check, so
+            // a failure here -- a schema not yet migrated, a database blip -- must
+            // deny cleanly (a 403, not a 500) and must never widen access. Closed
+            // by default: hand back nothing. Deliberately NOT cached, so recovery
+            // takes effect on the very next request instead of being pinned empty
+            // for the TTL.
+            log.error("Permission resolution failed for user {}; denying all (closed by default): {}",
+                    userId, e.getMessage());
+            return Set.of();
+        }
         writeCache(userId, effective);
         return effective;
     }
