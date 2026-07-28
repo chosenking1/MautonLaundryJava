@@ -3,11 +3,9 @@ package com.work.mautonlaundry.services;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.dtos.requests.userrequests.RegisterUserRequest;
-import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserRoleRequest;
 import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
-import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -30,8 +28,6 @@ public interface UserService {
     void deleteUserByEmail(String email);
 
     void deleteUserById(String id);
-
-    UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest request);
 
     void updateUserRole(UpdateUserRoleRequest request);
     

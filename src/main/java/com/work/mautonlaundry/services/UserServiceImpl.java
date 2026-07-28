@@ -11,11 +11,9 @@ import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.data.repository.VerificationTokenRepository;
 import com.work.mautonlaundry.util.TokenGenerator;
 import com.work.mautonlaundry.dtos.requests.userrequests.RegisterUserRequest;
-import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserRoleRequest;
 import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
-import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
 import com.work.mautonlaundry.exceptions.userexceptions.UserAlreadyExistsException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import com.work.mautonlaundry.security.service.AuthService;
@@ -267,33 +265,6 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         AppUser user = userRepository.findUserByEmail(email).orElseThrow(()-> new UserNotFoundException("User Doesnt Exist"));
         deleteUser(user);
 
-    }
-
-    @Override
-    @Transactional
-    public UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest user) {
-        UpdateUserDetailResponse updateResponse = new UpdateUserDetailResponse();
-
-        // Check if the user exists
-        if (isLoggedInUserAccount(user.getId()) || userIsAdmin()) {
-
-                AppUser existingUser = userRepository.findUserById(user.getId())
-                        .orElseThrow(() -> new UserNotFoundException("User doesn't exist"));;
-
-                // Update only the necessary fields
-                existingUser.setFull_name(user.getFirstname() + " " + user.getSecond_name());
-                existingUser.setPhone_number(user.getPhone_number());
-
-                // Save the updated user
-                userRepository.save(existingUser);
-                auditService.logAction("UPDATE", "USER", user.getId());
-
-                String message = "Details Updated Successfully";
-                mapper.map(message, updateResponse);
-                return updateResponse;
-            }
-
-        else {throw new AccessDeniedException("User not permitted to perform this operation");}
     }
 
     @Override
