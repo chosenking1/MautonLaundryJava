@@ -136,6 +136,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_zone_lgas_one_zone_per_lga ON zone_lgas (l
 -- ===========================================================================
 
 
+-- The pre-existing permissions table still has the legacy endpoint-binding
+-- columns NOT NULL. V10 relaxed them, but V10 is below the baseline so it never
+-- ran, and ddl-auto never drops a constraint even though the entity now allows
+-- null. The V2 seeds below insert only (name, description, category, active), so
+-- relax these first or every insert fails a not-null violation on action.
+-- Idempotent: DROP NOT NULL on an already-nullable column is a no-op.
+ALTER TABLE permissions ALTER COLUMN endpoint DROP NOT NULL;
+ALTER TABLE permissions ALTER COLUMN method   DROP NOT NULL;
+ALTER TABLE permissions ALTER COLUMN resource DROP NOT NULL;
+ALTER TABLE permissions ALTER COLUMN action   DROP NOT NULL;
+
+
 -- ===== seeds carried over from V18__seed_endpoint_permissions =====
 -- Permission Architecture V2 — permissions for every guarded endpoint.
 --
