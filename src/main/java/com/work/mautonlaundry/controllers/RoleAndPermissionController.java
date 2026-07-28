@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,5 +44,17 @@ public class RoleAndPermissionController {
     public ResponseEntity<Role> assignPermissionToRole(@Valid @RequestBody AssignPermissionToRoleRequest request) {
         Role updatedRole = roleAndPermissionService.assignPermissionToRole(request);
         return ResponseEntity.ok(updatedRole);
+    }
+
+    /**
+     * Withdraws a permission from a role. Guarded by the same permission as
+     * assigning: whoever may widen a role's access may narrow it.
+     */
+    @DeleteMapping("/roles/{roleId}/permissions/{permissionId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ROLE_PERMISSION_ASSIGN')")
+    public ResponseEntity<Role> removePermissionFromRole(
+            @PathVariable Long roleId,
+            @PathVariable Long permissionId) {
+        return ResponseEntity.ok(roleAndPermissionService.removePermissionFromRole(roleId, permissionId));
     }
 }
