@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 /**
  * One row in the Customer Intelligence list. Phone/email are masked for privacy.
- * Status is recency-based (ACTIVE/INACTIVE/AT_RISK/CHURNED). Acquisition source is
+ * Status is recency-based (NEW/ACTIVE/INACTIVE/AT_RISK/CHURNED). Acquisition source is
  * the referring CAS name, or "Organic".
  */
 public record CustomerListItemResponse(

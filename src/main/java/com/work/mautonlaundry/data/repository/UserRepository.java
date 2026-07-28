@@ -65,10 +65,14 @@ public interface UserRepository extends JpaRepository<AppUser, String> {
     @Query("SELECT COUNT(DISTINCT b.user) FROM Booking b WHERE b.deleted = false")
     Long countDistinctCustomers();
 
-    // All customers (role USER) who have placed at least one order. Aggregated metrics
-    // are assembled in the service from batch queries — sufficient at launch scale.
-    @Query("SELECT DISTINCT b.user FROM Booking b WHERE b.deleted = false AND b.user.role.name = 'USER'")
-    List<AppUser> findCustomersWithOrders();
+    // Every customer (role USER), whether or not they have ordered. Driving this
+    // from Booking instead — as it once did — hid every registered customer who
+    // had not yet placed an order, which is exactly the cohort the acquisition
+    // and activation views exist to surface. Aggregated metrics are assembled in
+    // the service from batch queries and default to zero for a customer with no
+    // orders — sufficient at launch scale.
+    @Query("SELECT u FROM AppUser u WHERE u.role.name = 'USER' AND (u.deleted IS NULL OR u.deleted = false)")
+    List<AppUser> findAllCustomers();
 
     // Inactive customers: have ordered before, but no order since :since (e.g. now - 45 days). Churn risk.
     @Query("SELECT COUNT(DISTINCT b.user) FROM Booking b WHERE b.deleted = false " +

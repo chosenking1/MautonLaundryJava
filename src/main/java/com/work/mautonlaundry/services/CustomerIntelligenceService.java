@@ -84,7 +84,7 @@ public class CustomerIntelligenceService {
         }
 
         List<CustomerListItemResponse> items = new ArrayList<>();
-        for (AppUser u : userRepository.findCustomersWithOrders()) {
+        for (AppUser u : userRepository.findAllCustomers()) {
             String id = u.getId();
             BigDecimal lifetime = spend.getOrDefault(id, BigDecimal.ZERO);
             LocalDateTime last = lastOrder.get(id);
@@ -184,7 +184,7 @@ public class CustomerIntelligenceService {
 
         record Scored(AppUser u, BigDecimal value) {}
         List<Scored> scored = new ArrayList<>();
-        for (AppUser u : userRepository.findCustomersWithOrders()) {
+        for (AppUser u : userRepository.findAllCustomers()) {
             BigDecimal lifetime = spend.getOrDefault(u.getId(), BigDecimal.ZERO);
             BigDecimal value = switch (m) {
                 case "ORDERS_THIS_MONTH" -> BigDecimal.valueOf(ordersThisMonth.getOrDefault(u.getId(), 0L));
@@ -320,7 +320,10 @@ public class CustomerIntelligenceService {
     }
 
     private String profileStatus(Long daysSinceLast, long ordersThisMonth, long ordersLastMonth) {
-        if (daysSinceLast == null) return "HIGH_CHURN_RISK";
+        // Never ordered: an un-activated signup, not a churn risk. Calling them
+        // HIGH_CHURN_RISK would put brand-new registrations at the top of the
+        // retention worklist, where they crowd out customers actually lapsing.
+        if (daysSinceLast == null) return "NEW";
         if (daysSinceLast > 90) return "HIGH_CHURN_RISK";
         if (daysSinceLast >= 45) return "AT_RISK";
         if (ordersThisMonth < ordersLastMonth) return "WATCHLIST"; // frequency dropped but still ordering
@@ -348,9 +351,13 @@ public class CustomerIntelligenceService {
         return d.substring(0, 4) + "****" + d.substring(d.length() - 2);
     }
 
-    /** ACTIVE <=30d, INACTIVE 31-60, AT_RISK 61-90, CHURNED >90 (or never ordered). */
+    /** NEW = never ordered; ACTIVE <=30d, INACTIVE 31-60, AT_RISK 61-90, CHURNED >90. */
     static String recencyStatus(LocalDateTime lastOrder, LocalDateTime now) {
-        if (lastOrder == null) return "CHURNED";
+        // Never ordered is NEW, not CHURNED: a customer who signed up yesterday
+        // has not lapsed, and lumping them in with lapsed customers both slanders
+        // the signup and inflates the churn figure. CHURNED stays reserved for
+        // someone who ordered and then stopped.
+        if (lastOrder == null) return "NEW";
         long days = ChronoUnit.DAYS.between(lastOrder, now);
         if (days <= 30) return "ACTIVE";
         if (days <= 60) return "INACTIVE";
