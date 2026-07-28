@@ -337,6 +337,17 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     @Transactional
+    public void resendVerificationById(String userId) {
+        AppUser user = userRepository.findUserById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new IllegalArgumentException("This user's email is already verified");
+        }
+        sendEmailVerification(user.getEmail());
+    }
+
+    @Override
+    @Transactional
     public boolean verifyEmail(String token) {
         VerificationToken verificationToken = tokenRepository.findByToken(token)
                 .orElse(null);

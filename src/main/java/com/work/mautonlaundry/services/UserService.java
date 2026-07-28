@@ -40,6 +40,9 @@ public interface UserService {
     
     // Email verification methods
     void sendEmailVerification(String email);
+
+    /** Admin resend: looks the user up by id, then reuses the same token+email flow. */
+    void resendVerificationById(String userId);
     boolean verifyEmail(String token);
     
     // Password reset methods

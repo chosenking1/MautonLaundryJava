@@ -41,8 +41,12 @@ public class AuthServiceImpl implements AuthService {
         AppUser user = userRepository.findUserByEmail(loginDto.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
+        // Password already checked above, so signalling "unverified" here leaks
+        // nothing. A dedicated exception (-> 403 EMAIL_NOT_VERIFIED) lets the
+        // apps route to a resend-verification screen instead of a dead end.
         if (!user.getEmailVerified()) {
-            throw new RuntimeException("Email not verified. Please verify your email before logging in.");
+            throw new com.work.mautonlaundry.exceptions.userexceptions.EmailNotVerifiedException(
+                    "Your email is not verified yet. Check your inbox or resend the verification email.");
         }
         
         if (user.getIsFirstLogin()) {

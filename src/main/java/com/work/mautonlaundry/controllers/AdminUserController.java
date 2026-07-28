@@ -25,6 +25,18 @@ public class AdminUserController {
         return ResponseEntity.ok(new MessageResponse("Agent deactivated successfully"));
     }
 
+    /**
+     * Resends the verification email for any customer, whether or not earlier
+     * sends reached them. Backed by the same replace-the-token flow the public
+     * resend uses, so only the newest link stays valid.
+     */
+    @PostMapping("/{userId}/resend-verification")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('USER_UPDATE')")
+    public ResponseEntity<MessageResponse> resendVerification(@PathVariable String userId) {
+        userService.resendVerificationById(userId);
+        return ResponseEntity.ok(new MessageResponse("Verification email sent"));
+    }
+
     @Data
     private static class DeactivateAgentRequest {
         private String reason;
