@@ -40,4 +40,23 @@ public interface RegionRepository extends JpaRepository<Region, String> {
     /** Which region a state already sits in, if any -- so the UI can warn before a move. */
     @Query(value = "SELECT region_id FROM region_states WHERE state_id = :stateId", nativeQuery = true)
     Optional<String> findRegionOfState(@Param("stateId") Integer stateId);
+
+    /**
+     * How many access records point at this region: assigned scopes, live
+     * temporary grants, and pending upgrade requests. Deleting a region out from
+     * under any of them would leave a scope resolving to a region that no longer
+     * exists -- a silent loss of data visibility for that user -- so a non-zero
+     * count blocks the delete rather than cascading.
+     */
+    @Query(value = """
+            SELECT (SELECT count(*) FROM user_scope WHERE region_id = :regionId)
+                 + (SELECT count(*) FROM temporary_scope_grants WHERE temporary_region_id = :regionId)
+                 + (SELECT count(*) FROM scope_upgrade_requests WHERE requested_region_id = :regionId)
+            """, nativeQuery = true)
+    long countScopeReferences(@Param("regionId") String regionId);
+
+    /** region_states rows go with the region (V25 declares ON DELETE CASCADE, but be explicit). */
+    @Modifying
+    @Query(value = "DELETE FROM region_states WHERE region_id = :regionId", nativeQuery = true)
+    void clearStates(@Param("regionId") String regionId);
 }

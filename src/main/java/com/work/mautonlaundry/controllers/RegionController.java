@@ -101,6 +101,31 @@ public class RegionController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Deletes a region. Its state memberships go with it, but the region is kept
+     * if any user scope, temporary grant or pending upgrade request still points
+     * at it: those would be left referencing a region that no longer exists,
+     * silently narrowing someone's visibility to nothing. Reassign them first.
+     */
+    @DeleteMapping("/{regionId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REGION_MANAGE')")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> delete(@PathVariable String regionId) {
+        Region region = regionRepository.findById(regionId).orElse(null);
+        if (region == null) {
+            return ResponseEntity.notFound().build();
+        }
+        long inUse = regionRepository.countScopeReferences(regionId);
+        if (inUse > 0) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "This region is still used by " + inUse
+                            + " scope assignment(s) or request(s). Reassign them before deleting it."));
+        }
+        regionRepository.clearStates(regionId);
+        regionRepository.delete(region);
+        return ResponseEntity.ok(Map.of("message", "Region deleted"));
+    }
+
     public static class CreateRegionRequest {
         @NotBlank public String name;
     }
