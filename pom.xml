@@ -149,7 +149,14 @@
             <version>8.10.1</version>
         </dependency>
 
-        <!-- Schema migrations -->
+        <!-- Schema migrations. Spring Boot 4.0 modularised auto-configuration:
+             FlywayAutoConfiguration moved out of spring-boot-autoconfigure into
+             this dedicated module. Without it, flyway-core is on the classpath
+             but nothing ever wires Flyway up, so migrations silently never run. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-flyway</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
