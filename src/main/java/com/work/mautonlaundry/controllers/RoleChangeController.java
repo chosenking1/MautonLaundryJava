@@ -20,7 +20,7 @@ public class RoleChangeController {
     private final RoleChangeService roleChangeService;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('ROLE_CHANGE_CREATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ROLE_CHANGE_CREATE')")
     public ResponseEntity<RoleChangeRequest> createRequest(@Valid @RequestBody CreateRoleChangeRequest request) {
         String userId = request.getUserId();
         String roleName = request.getRequestedRole();
@@ -30,7 +30,7 @@ public class RoleChangeController {
     }
 
     @PatchMapping("/{requestId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('ROLE_CHANGE_UPDATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ROLE_CHANGE_UPDATE')")
     public ResponseEntity<RoleChangeRequest> updateRequestStatus(
             @PathVariable Long requestId,
             @Valid @RequestBody UpdateRoleChangeStatusRequest request) {
@@ -50,7 +50,7 @@ public class RoleChangeController {
     }
 
     @GetMapping("/pending")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('ROLE_CHANGE_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('ROLE_CHANGE_READ')")
     public ResponseEntity<List<RoleChangeRequest>> getPendingRequests() {
         return ResponseEntity.ok(roleChangeService.getPendingRequests());
     }

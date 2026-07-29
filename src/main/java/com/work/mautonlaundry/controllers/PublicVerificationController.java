@@ -45,7 +45,7 @@ public class PublicVerificationController {
         log.info("Password reset page accessed via /reset-password endpoint");
         return ResponseEntity.ok()
                 .header("Content-Type", "text/html; charset=UTF-8")
-                .body(buildResetPasswordHtml());
+                .body(buildResetPasswordHtml(token));
     }
 
     private String buildSuccessHtml() {
@@ -116,7 +116,9 @@ public class PublicVerificationController {
                 "</html>";
     }
 
-    private String buildResetPasswordHtml() {
+    private String buildResetPasswordHtml(String token) {
+        // Token is a server-generated secure token (alphanumeric); embed as a JS string.
+        String safeToken = token == null ? "" : token.replace("\\", "").replace("\"", "").replace("<", "").replace(">", "");
         return "<!DOCTYPE html>" +
                 "<html lang=\"en\">" +
                 "<head>" +
@@ -126,26 +128,52 @@ public class PublicVerificationController {
                 "<style>" +
                 "* { margin: 0; padding: 0; box-sizing: border-box; }" +
                 "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }" +
-                ".container { background: white; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); padding: 60px 40px; text-align: center; max-width: 450px; width: 100%; }" +
-                ".icon { width: 80px; height: 80px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 30px; }" +
-                ".icon svg { width: 40px; height: 40px; fill: white; }" +
-                "h1 { color: #1F2937; font-size: 28px; font-weight: 700; margin-bottom: 16px; }" +
-                "p { color: #6B7280; font-size: 16px; line-height: 1.6; margin-bottom: 30px; }" +
-                ".btn { display: inline-block; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 16px; transition: transform 0.2s, box-shadow 0.2s; }" +
-                ".btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(250, 112, 154, 0.4); }" +
+                ".container { background: white; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); padding: 48px 40px; max-width: 440px; width: 100%; }" +
+                "h1 { color: #1F2937; font-size: 26px; font-weight: 700; margin-bottom: 8px; text-align: center; }" +
+                "p.sub { color: #6B7280; font-size: 15px; line-height: 1.5; margin-bottom: 24px; text-align: center; }" +
+                "label { display: block; font-size: 14px; color: #374151; font-weight: 600; margin-bottom: 6px; }" +
+                "input { width: 100%; padding: 12px 14px; border: 1px solid #D1D5DB; border-radius: 10px; font-size: 15px; margin-bottom: 16px; }" +
+                "input:focus { outline: none; border-color: #fa709a; box-shadow: 0 0 0 3px rgba(250,112,154,0.2); }" +
+                "button { width: 100%; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 14px; border: none; border-radius: 12px; font-weight: 600; font-size: 16px; cursor: pointer; }" +
+                "button:disabled { opacity: 0.6; cursor: not-allowed; }" +
+                "#msg { margin-top: 14px; font-size: 14px; text-align: center; min-height: 18px; }" +
+                ".ok { color: #047857; } .err { color: #B91C1C; }" +
                 "</style>" +
                 "</head>" +
                 "<body>" +
-                "<div class=\"container\">" +
-                "<div class=\"icon\">" +
-                "<svg viewBox=\"0 0 20 20\" xmlns=\"http://www.w3.org/2000/svg\">" +
-                "<path fill-rule=\"evenodd\" d=\"M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z\" clip-rule=\"evenodd\"/>" +
-                "</svg>" +
+                "<div class=\"container\" id=\"card\">" +
+                "<h1>Reset your password</h1>" +
+                "<p class=\"sub\">Enter a new password for your Imototo account.</p>" +
+                "<form id=\"f\">" +
+                "<label for=\"pw\">New password</label>" +
+                "<input type=\"password\" id=\"pw\" autocomplete=\"new-password\" minlength=\"6\" required>" +
+                "<label for=\"cp\">Confirm password</label>" +
+                "<input type=\"password\" id=\"cp\" autocomplete=\"new-password\" minlength=\"6\" required>" +
+                "<button type=\"submit\" id=\"btn\">Reset password</button>" +
+                "<div id=\"msg\"></div>" +
+                "</form>" +
                 "</div>" +
-                "<h1>Reset Password</h1>" +
-                "<p>Please use the Imototo Clean mobile app to reset your password.</p>" +
-                "<a href=\"https://imototo-clean.vercel.app/reset-password\" class=\"btn\">Open App to Reset</a>" +
-                "</div>" +
+                "<script>" +
+                "var token = \"" + safeToken + "\";" +
+                "var f = document.getElementById('f');" +
+                "var msg = document.getElementById('msg');" +
+                "f.addEventListener('submit', function(e){" +
+                "  e.preventDefault();" +
+                "  var pw = document.getElementById('pw').value;" +
+                "  var cp = document.getElementById('cp').value;" +
+                "  msg.className=''; msg.textContent='';" +
+                "  if (pw.length < 6) { msg.className='err'; msg.textContent='Password must be at least 6 characters.'; return; }" +
+                "  if (pw !== cp) { msg.className='err'; msg.textContent='Passwords do not match.'; return; }" +
+                "  var btn = document.getElementById('btn'); btn.disabled = true;" +
+                "  fetch('/api/auth/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token: token, newPassword: pw }) })" +
+                "    .then(function(res){ return res.text().then(function(t){ return { ok: res.ok, text: t }; }); })" +
+                "    .then(function(r){" +
+                "      if (r.ok) { document.getElementById('card').innerHTML = '<h1>Password reset</h1><p class=\\\"sub\\\">Your password has been updated. You can now log in.</p>'; }" +
+                "      else { btn.disabled=false; msg.className='err'; msg.textContent = r.text || 'Reset failed. The link may have expired.'; }" +
+                "    })" +
+                "    .catch(function(){ btn.disabled=false; msg.className='err'; msg.textContent='Something went wrong. Please try again.'; });" +
+                "});" +
+                "</script>" +
                 "</body>" +
                 "</html>";
     }

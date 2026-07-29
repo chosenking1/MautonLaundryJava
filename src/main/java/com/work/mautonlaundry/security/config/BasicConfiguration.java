@@ -45,8 +45,11 @@ public class BasicConfiguration{
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests((authorize) -> authorize
-                        .requestMatchers("/login").permitAll()
-                        .requestMatchers("/register").permitAll()
+                        // No bare /login or /register rule: the only handler for
+                        // "/login" was LegacyAuthController (removed), and
+                        // "/register" never had one -- AuthController's sits under
+                        // /api/auth. A permitAll matching no handler is a trap: it
+                        // silently makes any future handler on that path public.
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/verify").permitAll()
                         .requestMatchers("/reset-password").permitAll()

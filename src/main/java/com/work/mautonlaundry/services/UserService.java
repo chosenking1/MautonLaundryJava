@@ -3,11 +3,9 @@ package com.work.mautonlaundry.services;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.dtos.requests.userrequests.RegisterUserRequest;
-import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserRoleRequest;
 import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
-import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -31,8 +29,6 @@ public interface UserService {
 
     void deleteUserById(String id);
 
-    UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest request);
-
     void updateUserRole(UpdateUserRoleRequest request);
     
     // Get all users with pagination
@@ -40,6 +36,9 @@ public interface UserService {
     
     // Email verification methods
     void sendEmailVerification(String email);
+
+    /** Admin resend: looks the user up by id, then reuses the same token+email flow. */
+    void resendVerificationById(String userId);
     boolean verifyEmail(String token);
     
     // Password reset methods

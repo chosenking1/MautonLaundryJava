@@ -16,18 +16,19 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/categories")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminCategoryController {
     
     private final CategoryRepository categoryRepository;
 
     @GetMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CATEGORY_VIEW')")
     public ResponseEntity<List<Category>> getAllCategories() {
         List<Category> categories = categoryRepository.findAll();
         return ResponseEntity.ok(categories);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CATEGORY_VIEW')")
     public ResponseEntity<Category> getCategory(@PathVariable Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
@@ -35,6 +36,7 @@ public class AdminCategoryController {
     }
 
     @PostMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CATEGORY_CREATE')")
     public ResponseEntity<Category> createCategory(@RequestBody CreateCategoryRequest request) {
         if (categoryRepository.existsByName(request.getName())) {
             throw new RuntimeException("Category already exists");
@@ -50,6 +52,7 @@ public class AdminCategoryController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CATEGORY_EDIT')")
     public ResponseEntity<Category> updateCategory(@PathVariable Long id, @RequestBody UpdateCategoryRequest request) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
@@ -69,6 +72,7 @@ public class AdminCategoryController {
     }
 
     @PatchMapping("/{id}/activate")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CATEGORY_EDIT')")
     public ResponseEntity<Void> activateCategory(@PathVariable Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
@@ -79,6 +83,7 @@ public class AdminCategoryController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('CATEGORY_DELETE')")
     public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));

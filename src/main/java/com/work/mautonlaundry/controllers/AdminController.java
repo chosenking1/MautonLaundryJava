@@ -15,13 +15,13 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
     
     private final AnalyticsService analyticsService;
     private final UserService userService;
 
     @GetMapping("/users")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('USER_READ')")
     public ResponseEntity<Page<FindUserResponse>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -31,6 +31,7 @@ public class AdminController {
     }
 
     @GetMapping("/audit-logs")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AUDIT_LOG_VIEW')")
     public ResponseEntity<Page<AuditLogResponse>> getAuditLogs(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {

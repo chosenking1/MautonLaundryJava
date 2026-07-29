@@ -42,7 +42,9 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async
     public void sendPasswordResetEmail(String email, String token) {
-        String resetUrl = baseUrl + "/api/auth/reset-password?token=" + token;
+        // Point at the public HTML reset page (which renders a working new-password form),
+        // not the JSON API endpoint.
+        String resetUrl = baseUrl + "/reset-password?token=" + token;
         String subject = "Password Reset - " + fromName;
         String body = buildPasswordResetEmailBody(resetUrl);
         sendEmail(email, subject, body);

@@ -16,12 +16,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/leaderboards")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class LeaderboardController {
 
     private final CustomerIntelligenceService customerIntelligenceService;
 
     @GetMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('LEADERBOARD_VIEW')")
     public ResponseEntity<List<LeaderboardEntry>> leaderboard(
             @RequestParam(defaultValue = "LIFETIME_SPEND") String metric,
             @RequestParam(defaultValue = "10") int limit) {
@@ -29,6 +29,7 @@ public class LeaderboardController {
     }
 
     @GetMapping("/export")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('LEADERBOARD_EXPORT')")
     public ResponseEntity<String> export(
             @RequestParam(defaultValue = "LIFETIME_SPEND") String metric,
             @RequestParam(defaultValue = "10") int limit) {

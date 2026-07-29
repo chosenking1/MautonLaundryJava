@@ -58,6 +58,11 @@ RUN apk add --no-cache \
 WORKDIR /mautonLaundry
 
 COPY pom.xml .
+# lombok.config must be present at compile time, or Lombok will not copy @Lazy
+# onto the generated constructor parameters -- and the UserAccessService <->
+# MakerCheckerService cycle break silently disappears, failing startup. It lives
+# at the repo root, so it has to be copied explicitly alongside pom.xml.
+COPY lombok.config .
 COPY src ./src
 
 RUN mvn -B clean package -DskipTests

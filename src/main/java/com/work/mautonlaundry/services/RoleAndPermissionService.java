@@ -7,6 +7,7 @@ import com.work.mautonlaundry.data.repository.RoleRepository;
 import com.work.mautonlaundry.dtos.requests.permissionrequests.CreatePermissionRequest;
 import com.work.mautonlaundry.dtos.requests.rolerequests.AssignPermissionToRoleRequest;
 import com.work.mautonlaundry.dtos.requests.rolerequests.CreateRoleRequest;
+import com.work.mautonlaundry.security.PermissionEvaluationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ public class RoleAndPermissionService {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final PermissionEvaluationService permissionEvaluationService;
 
     @Transactional
     public Permission createPermission(CreatePermissionRequest request) {
@@ -51,6 +53,41 @@ public class RoleAndPermissionService {
                 .orElseThrow(() -> new RuntimeException("Permission not found with ID: " + request.getPermissionId()));
 
         role.getPermissions().add(permission);
-        return roleRepository.save(role);
+        Role saved = roleRepository.save(role);
+        invalidateCachedPermissions();
+        return saved;
+    }
+
+    /**
+     * Takes a permission off a role. The counterpart to
+     * {@link #assignPermissionToRole} -- without it a permission granted to a
+     * role by mistake could never be withdrawn from the portal.
+     *
+     * <p>Removing a permission a role does not hold is a no-op rather than an
+     * error, so the operation is safely repeatable.
+     */
+    @Transactional
+    public Role removePermissionFromRole(Long roleId, Long permissionId) {
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new RuntimeException("Role not found with ID: " + roleId));
+
+        Permission permission = permissionRepository.findById(permissionId)
+                .orElseThrow(() -> new RuntimeException("Permission not found with ID: " + permissionId));
+
+        role.getPermissions().remove(permission);
+        Role saved = roleRepository.save(role);
+        invalidateCachedPermissions();
+        return saved;
+    }
+
+    /**
+     * A role change alters the effective permissions of every user holding that
+     * role, and the evaluation cache is keyed by user, not by role -- so there is
+     * no narrower invalidation available. Skipping this would leave a revoked
+     * permission usable for the rest of the cache TTL, which for a revoke is a
+     * security hole rather than a staleness annoyance.
+     */
+    private void invalidateCachedPermissions() {
+        permissionEvaluationService.invalidateAll();
     }
 }

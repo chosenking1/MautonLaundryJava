@@ -32,35 +32,35 @@ public class DeliveryDispatchController {
     private final DispatchEngine dispatchEngine;
 
     @GetMapping("/available")
-    @PreAuthorize("hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DELIVERY_JOB_VIEW')")
     public ResponseEntity<List<AvailableDeliveryJobResponse>> getAvailableJobs() {
         String agentId = SecurityUtil.getCurrentUser().orElseThrow().getId();
         return ResponseEntity.ok(dispatchEngine.getAvailableJobsForAgent(agentId));
     }
 
     @GetMapping("/assignments/active")
-    @PreAuthorize("hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DELIVERY_JOB_VIEW')")
     public ResponseEntity<List<DeliveryAssignmentSummaryResponse>> getActiveAssignments() {
         String agentId = SecurityUtil.getCurrentUser().orElseThrow().getId();
         return ResponseEntity.ok(deliveryService.getActiveAssignmentsForAgent(agentId));
     }
 
     @GetMapping("/assignments/completed")
-    @PreAuthorize("hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DELIVERY_JOB_VIEW')")
     public ResponseEntity<List<DeliveryAssignmentSummaryResponse>> getCompletedAssignments() {
         String agentId = SecurityUtil.getCurrentUser().orElseThrow().getId();
         return ResponseEntity.ok(deliveryService.getCompletedAssignmentsForAgent(agentId));
     }
 
     @PostMapping("/accept")
-    @PreAuthorize("hasAuthority('DELIVERY_UPDATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DELIVERY_UPDATE')")
     public ResponseEntity<AcceptDeliveryJobResponse> acceptDeliveryJob(
             @Valid @RequestBody AcceptDeliveryJobRequest request) {
         return ResponseEntity.ok(deliveryService.acceptDeliveryJob(request));
     }
 
     @PostMapping("/{bookingId}/status")
-    @PreAuthorize("hasAuthority('DELIVERY_UPDATE')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DELIVERY_UPDATE')")
     public ResponseEntity<DeliveryStatusUpdateResponse> updateDeliveryStatus(
             @PathVariable String bookingId,
             @Valid @RequestBody UpdateDeliveryStatusRequest request) {
@@ -68,7 +68,7 @@ public class DeliveryDispatchController {
     }
 
     @PostMapping("/dispatch")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISPATCH_RIDER_ASSIGN')")
     public ResponseEntity<MessageResponse> forceDispatchJob(
             @Valid @RequestBody ForceDispatchJobRequest request) {
         DeliveryAssignmentPhase phase = null;

@@ -32,11 +32,21 @@ build/
 ### VS Code ###
 .vscode/
 /uploads
-/src/test
+# NOTE: /src/test was ignored here, which kept the entire test suite -- 24 files,
+# 170 tests -- out of version control and alive only on one laptop. Same failure
+# as the blanket *.sql rule below: a broad ignore silently excluding the files
+# that matter most. Tests are tracked.
 *.docx
 *.md
 *.db
+# Keeps local dumps and scratch queries out of the repo...
 *.sql
+# ...but Flyway migrations are source, not data. Without this exception the
+# blanket *.sql above silently excluded V5 onwards: they lived only on one
+# laptop and never deployed, so their DROPs never ran anywhere (ddl-auto=update
+# creates tables from entities, which masked the missing CREATEs but can never
+# perform a drop).
+!src/main/resources/db/migration/*.sql
 .DS_Store
 .env
 .env.*
