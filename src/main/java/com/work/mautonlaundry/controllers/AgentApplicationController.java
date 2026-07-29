@@ -39,7 +39,7 @@ public class AgentApplicationController {
     }
 
     @GetMapping("/api/v1/admin/agent-applications")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_APPLICATION_VIEW')")
     public ResponseEntity<List<AgentApplicationResponse>> getApplications(
             @RequestParam(required = false) AgentApplicationStatus status,
             @RequestParam(required = false) AgentApplicationType type) {
@@ -50,7 +50,7 @@ public class AgentApplicationController {
     }
 
     @PatchMapping("/api/v1/admin/agent-applications/{id}/inspection")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_APPLICATION_INSPECT')")
     public ResponseEntity<AgentApplicationResponse> inspectLaundryApplication(
             @PathVariable Long id,
             @Valid @RequestBody InspectAgentApplicationRequest request) {
@@ -65,7 +65,7 @@ public class AgentApplicationController {
     }
 
     @PatchMapping("/api/v1/admin/agent-applications/{id}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_APPLICATION_REJECT')")
     public ResponseEntity<AgentApplicationResponse> rejectApplication(
             @PathVariable Long id,
             @Valid @RequestBody RejectAgentApplicationRequest request) {
@@ -74,7 +74,7 @@ public class AgentApplicationController {
     }
 
     @PostMapping("/api/v1/admin/agent-applications/{id}/role-change")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_APPLICATION_APPROVE')")
     public ResponseEntity<Void> createRoleChangeRequest(@PathVariable Long id) {
         agentApplicationService.createRoleChangeRequest(id);
         return ResponseEntity.ok().build();

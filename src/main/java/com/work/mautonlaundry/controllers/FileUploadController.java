@@ -19,7 +19,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin/files")
-@PreAuthorize("hasRole('ADMIN')")
 public class FileUploadController {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
@@ -36,6 +35,7 @@ public class FileUploadController {
     private String baseUrl;
 
     @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('FILE_UPLOAD')")
     public ResponseEntity<UploadResponse> uploadImage(@RequestPart("file") MultipartFile file) {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File is empty");

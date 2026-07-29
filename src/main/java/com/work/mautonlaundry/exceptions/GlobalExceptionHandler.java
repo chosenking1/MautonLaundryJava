@@ -106,15 +106,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
     }
 
+    @ExceptionHandler(com.work.mautonlaundry.exceptions.userexceptions.EmailNotVerifiedException.class)
+    public ResponseEntity<ErrorResponse> handleEmailNotVerified(
+            com.work.mautonlaundry.exceptions.userexceptions.EmailNotVerifiedException ex) {
+        // Distinct code so clients route to the resend-verification flow.
+        ErrorResponse error = new ErrorResponse("EMAIL_NOT_VERIFIED", ex.getMessage(), LocalDateTime.now());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        StringBuilder message = new StringBuilder("Validation failed: ");
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            message.append(fieldName).append(" - ").append(errorMessage).append("; ");
-        });
-        ErrorResponse error = new ErrorResponse("VALIDATION_ERROR", message.toString(), LocalDateTime.now());
+        // The constraint messages are already written as user-facing sentences
+        // ("First name must contain only letters"), so return them as-is --
+        // joined when several fields fail -- rather than the old
+        // "Validation failed: fieldName - message;" developer format the apps
+        // showed verbatim in a snackbar.
+        String message = ex.getBindingResult().getAllErrors().stream()
+                .map(error -> error.getDefaultMessage())
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(" "));
+        if (message.isBlank()) {
+            message = "Some of the details you entered are invalid. Please check and try again.";
+        }
+        ErrorResponse error = new ErrorResponse("VALIDATION_ERROR", message, LocalDateTime.now());
         return ResponseEntity.badRequest().body(error);
     }
 

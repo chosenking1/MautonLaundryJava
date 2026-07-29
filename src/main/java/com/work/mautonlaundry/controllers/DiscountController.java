@@ -95,7 +95,7 @@ public class DiscountController {
     }
 
     @GetMapping("/approvals/pending")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_VIEW')")
     public ResponseEntity<Page<DiscountUserAssignment>> getPendingApprovals(
             @RequestParam(required = false) String discountId,
             Pageable pageable) {
@@ -110,7 +110,7 @@ public class DiscountController {
     }
 
     @PostMapping("/approvals/{assignmentId}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_APPROVE')")
     public ResponseEntity<Void> approveAssignment(@PathVariable String assignmentId) {
         String adminId = SecurityUtil.getCurrentUserId();
         discountService.approveAssignment(assignmentId, adminId);
@@ -118,7 +118,7 @@ public class DiscountController {
     }
 
     @PostMapping("/approvals/{assignmentId}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_APPROVE')")
     public ResponseEntity<Void> rejectAssignment(
             @PathVariable String assignmentId,
             @RequestBody Map<String, String> request) {
@@ -129,7 +129,7 @@ public class DiscountController {
     }
 
     @PostMapping("/assignments/revoke")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_REVOKE')")
     public ResponseEntity<Void> revokeAssignment(@RequestBody Map<String, String> request) {
         String adminId = SecurityUtil.getCurrentUserId();
         String discountId = request.get("discountId");
@@ -139,7 +139,7 @@ public class DiscountController {
     }
 
     @GetMapping("/{discountId}/assignments")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_VIEW')")
     public ResponseEntity<Page<DiscountUserAssignment>> getAssignments(
             @PathVariable String discountId,
             @RequestParam(required = false) ApprovalStatus status,
@@ -154,7 +154,7 @@ public class DiscountController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_CREATE')")
     public ResponseEntity<Discount> createDiscount(@RequestBody Discount request) {
         String adminId = SecurityUtil.getCurrentUserId();
         request.setCreatedBy(adminId);
@@ -164,13 +164,13 @@ public class DiscountController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_VIEW')")
     public ResponseEntity<Page<Discount>> getAllDiscounts(Pageable pageable) {
         return ResponseEntity.ok(discountRepository.findAll(pageable));
     }
 
     @GetMapping("/{discountId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_VIEW')")
     public ResponseEntity<Discount> getDiscount(@PathVariable String discountId) {
         return discountRepository.findById(discountId)
                 .map(ResponseEntity::ok)
@@ -178,7 +178,7 @@ public class DiscountController {
     }
 
     @PutMapping("/{discountId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('DISCOUNT_EDIT')")
     public ResponseEntity<Discount> updateDiscount(
             @PathVariable String discountId,
             @RequestBody Discount request) {

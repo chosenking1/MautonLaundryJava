@@ -11,11 +11,9 @@ import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.data.repository.VerificationTokenRepository;
 import com.work.mautonlaundry.util.TokenGenerator;
 import com.work.mautonlaundry.dtos.requests.userrequests.RegisterUserRequest;
-import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserDetailRequest;
 import com.work.mautonlaundry.dtos.requests.userrequests.UpdateUserRoleRequest;
 import com.work.mautonlaundry.dtos.responses.userresponse.FindUserResponse;
 import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse;
-import com.work.mautonlaundry.dtos.responses.userresponse.UpdateUserDetailResponse;
 import com.work.mautonlaundry.exceptions.userexceptions.UserAlreadyExistsException;
 import com.work.mautonlaundry.exceptions.userexceptions.UserNotFoundException;
 import com.work.mautonlaundry.security.service.AuthService;
@@ -41,6 +39,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.*;
@@ -269,34 +269,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     @Transactional
-    public UpdateUserDetailResponse userDetailsUpdate(UpdateUserDetailRequest user) {
-        UpdateUserDetailResponse updateResponse = new UpdateUserDetailResponse();
-
-        // Check if the user exists
-        if (isLoggedInUserAccount(user.getId()) || userIsAdmin()) {
-
-                AppUser existingUser = userRepository.findUserById(user.getId())
-                        .orElseThrow(() -> new UserNotFoundException("User doesn't exist"));;
-
-                // Update only the necessary fields
-                existingUser.setFull_name(user.getFirstname() + " " + user.getSecond_name());
-                existingUser.setPhone_number(user.getPhone_number());
-
-                // Save the updated user
-                userRepository.save(existingUser);
-                auditService.logAction("UPDATE", "USER", user.getId());
-
-                String message = "Details Updated Successfully";
-                mapper.map(message, updateResponse);
-                return updateResponse;
-            }
-
-        else {throw new AccessDeniedException("User not permitted to perform this operation");}
-    }
-
-    @Override
-    @Transactional
-    @PreAuthorize("hasAuthority('USER_UPDATE')") // Changed from hasRole('ADMIN')
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('USER_UPDATE')")
     public void updateUserRole(UpdateUserRoleRequest request) {
         // This method should be deprecated or updated to use RoleChangeRequest
         // For now, we'll implement direct update for ADMINs as a fallback
@@ -326,10 +299,22 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         String token = tokenGenerator.generateSecureToken();
         VerificationToken verificationToken = new VerificationToken(token, user, VerificationToken.TokenType.EMAIL_VERIFICATION, verificationTokenExpiryHours);
         tokenRepository.save(verificationToken);
-        
-        log.info("Sending verification email to: {}", email);
-        emailService.sendVerificationEmail(email, token);
-        log.info("Verification email sent successfully to: {}", email);
+
+        // Send only after this transaction commits, so a token whose insert rolls
+        // back at commit never produces a live email with a dead token.
+        sendAfterCommit(() -> emailService.sendVerificationEmail(email, token));
+        log.info("Verification email queued for {} (sends after commit)", email);
+    }
+
+    @Override
+    @Transactional
+    public void resendVerificationById(String userId) {
+        AppUser user = userRepository.findUserById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new IllegalArgumentException("This user's email is already verified");
+        }
+        sendEmailVerification(user.getEmail());
     }
 
     @Override
@@ -367,8 +352,33 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         String token = tokenGenerator.generateSecureToken();
         VerificationToken resetToken = new VerificationToken(token, user, VerificationToken.TokenType.PASSWORD_RESET, passwordResetTokenExpiryHours);
         tokenRepository.save(resetToken);
-        
-        emailService.sendPasswordResetEmail(email, token);
+
+        // Send only after this transaction commits. Before, the email went out
+        // inside the transaction; when the insert later failed at commit (e.g. the
+        // stale UNIQUE(user_id) constraint), the user received a reset link whose
+        // token had been rolled back -- hence "invalid or expired" at reset time.
+        sendAfterCommit(() -> emailService.sendPasswordResetEmail(email, token));
+    }
+
+    /**
+     * Runs {@code action} after the current transaction commits, and only if it
+     * commits. Keeps a side effect that cannot be rolled back -- sending an email
+     * -- from firing for a database change that does not survive commit.
+     *
+     * <p>Falls back to running inline when there is no active transaction, so a
+     * caller outside a transactional context still behaves.
+     */
+    private void sendAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
     @Override
@@ -376,11 +386,27 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     public boolean resetPassword(String token, String newPassword) {
         VerificationToken resetToken = tokenRepository.findByToken(token)
                 .orElse(null);
-        
-        if (resetToken == null || resetToken.isExpired() || resetToken.isUsed()) {
+
+        // Split the three rejection reasons so a failed reset is diagnosable from
+        // the logs. The response stays a single generic message (it must not tell
+        // an anonymous caller whether a token exists), but the server records which
+        // of not-found / expired / already-used actually fired.
+        if (resetToken == null) {
+            log.warn("Password reset rejected: no verification_tokens row matches the presented token "
+                    + "(token replaced by a newer reset request, or the wrong environment's link)");
             return false;
         }
-        
+        if (resetToken.isExpired()) {
+            log.warn("Password reset rejected: token for user {} expired at {} (now {})",
+                    resetToken.getUser().getId(), resetToken.getExpiryDate(), java.time.LocalDateTime.now());
+            return false;
+        }
+        if (resetToken.isUsed()) {
+            log.warn("Password reset rejected: token for user {} was already used",
+                    resetToken.getUser().getId());
+            return false;
+        }
+
         // Validate password
         if (newPassword == null || newPassword.length() < 6 || newPassword.length() > 15) {
             throw new IllegalArgumentException("Password must be between 6 and 15 characters");

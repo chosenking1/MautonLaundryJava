@@ -27,6 +27,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import com.work.mautonlaundry.security.scope.ScopeFilterService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +49,7 @@ public class BookingService {
     private final ServiceRepository serviceRepository;
     private final ServicePricingRepository servicePricingRepository;
     private final AuditService auditService;
+    private final ScopeFilterService scopeFilterService;
     private final LaundryAssignmentService laundryAssignmentService;
     private final DispatchEngine dispatchEngine;
     private final NotificationService notificationService;
@@ -351,14 +354,41 @@ public class BookingService {
         return mapBookingsToDetails(bookings);
     }
 
+    /**
+     * The admin booking list, filtered to the caller's data scope
+     * (Permission Architecture V2, spec §5).
+     *
+     * <p>Scope is a separate dimension from permission: reaching this method
+     * already required hasRole('ADMIN'), and it still only returns the orders the
+     * caller's scope covers. A Lagos State Head sees Lagos orders; a NATIONAL
+     * admin sees everything, which is what every admin is seeded with in
+     * V17__seed_user_scope.sql, so this changes nothing until someone is
+     * deliberately narrowed.
+     *
+     * <p>Fails closed: an admin with no user_scope row gets an empty page, not
+     * every order.
+     */
     public Page<BookingDetailsResponse> getAllBookings(Pageable pageable) {
-        Page<Booking> bookings = bookingRepository.findByDeletedFalse(pageable);
-        return mapBookingsToDetails(bookings);
+        Specification<Booking> spec = scopeFilterService.getScope(Booking.class)
+                .and(notDeleted());
+        return mapBookingsToDetails(bookingRepository.findAll(spec, pageable));
     }
 
+    /** @see #getAllBookings(Pageable) */
     public Page<BookingDetailsResponse> getAllBookingsByStatus(Pageable pageable, BookingStatus status) {
-        Page<Booking> bookings = bookingRepository.findByStatusAndDeletedFalse(status, pageable);
-        return mapBookingsToDetails(bookings);
+        Specification<Booking> spec = scopeFilterService.getScope(Booking.class)
+                .and(notDeleted())
+                .and(hasStatus(status));
+        return mapBookingsToDetails(bookingRepository.findAll(spec, pageable));
+    }
+
+    /** Replaces the derived findByDeletedFalse, so scope can be AND-ed on. */
+    private static Specification<Booking> notDeleted() {
+        return (root, query, cb) -> cb.isFalse(root.get("deleted"));
+    }
+
+    private static Specification<Booking> hasStatus(BookingStatus status) {
+        return (root, query, cb) -> cb.equal(root.get("status"), status);
     }
 
     private Page<BookingDetailsResponse> mapBookingsToDetails(Page<Booking> bookings) {

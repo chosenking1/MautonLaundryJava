@@ -22,7 +22,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/referrals")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminReferralController {
 
     private final ReferralService referralService;
@@ -30,6 +29,7 @@ public class AdminReferralController {
     // ---- Referrers ----
 
     @GetMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_VIEW')")
     public ResponseEntity<Page<ReferrerListItemResponse>> list(
             @RequestParam(required = false) ReferrerType type,
             @RequestParam(required = false) Boolean active,
@@ -41,28 +41,33 @@ public class AdminReferralController {
     }
 
     @PostMapping
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_CREATE')")
     public ResponseEntity<ReferrerResponse> create(@Valid @RequestBody CreateReferrerRequest request) {
         ReferrerResponse response = referralService.createReferrer(request, SecurityUtil.getCurrentUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_VIEW')")
     public ResponseEntity<ReferrerResponse> get(@PathVariable String id) {
         return ResponseEntity.ok(referralService.getReferrer(id));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_EDIT')")
     public ResponseEntity<ReferrerResponse> update(@PathVariable String id,
                                                    @Valid @RequestBody UpdateReferrerRequest request) {
         return ResponseEntity.ok(referralService.updateReferrer(id, request));
     }
 
     @GetMapping("/{id}/dashboard")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_VIEW')")
     public ResponseEntity<AdminReferrerDashboardResponse> dashboard(@PathVariable String id) {
         return ResponseEntity.ok(referralService.getReferrerDashboard(id));
     }
 
     @GetMapping("/{id}/customers")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_VIEW')")
     public ResponseEntity<List<ReferralCustomerResponse>> customers(
             @PathVariable String id,
             @RequestParam(defaultValue = "false") boolean onlyRepeat) {
@@ -72,11 +77,13 @@ public class AdminReferralController {
     // ---- Rules ----
 
     @GetMapping("/{id}/rules")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_RULE_VIEW')")
     public ResponseEntity<List<ReferralRuleResponse>> rules(@PathVariable String id) {
         return ResponseEntity.ok(referralService.getRules(id));
     }
 
     @PostMapping("/{id}/rules")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_RULE_EDIT')")
     public ResponseEntity<ReferralRuleResponse> addRule(@PathVariable String id,
                                                         @Valid @RequestBody ReferralRuleRequest request) {
         ReferralRuleResponse response = referralService.addRule(id, request, SecurityUtil.getCurrentUserId());
@@ -84,6 +91,7 @@ public class AdminReferralController {
     }
 
     @PutMapping("/{id}/rules/{ruleId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_RULE_EDIT')")
     public ResponseEntity<ReferralRuleResponse> updateRule(@PathVariable String id,
                                                            @PathVariable String ruleId,
                                                            @Valid @RequestBody ReferralRuleRequest request) {
@@ -91,12 +99,14 @@ public class AdminReferralController {
     }
 
     @DeleteMapping("/{id}/rules/{ruleId}")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_RULE_EDIT')")
     public ResponseEntity<Void> deactivateRule(@PathVariable String id, @PathVariable String ruleId) {
         referralService.deactivateRule(id, ruleId, SecurityUtil.getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/rules")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_RULE_EDIT')")
     public ResponseEntity<List<ReferralRuleResponse>> replaceRules(
             @PathVariable String id,
             @Valid @RequestBody UpdateReferrerRulesRequest request) {
@@ -104,6 +114,7 @@ public class AdminReferralController {
     }
 
     @GetMapping("/{id}/rules/history")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_RULE_VIEW')")
     public ResponseEntity<List<RuleHistoryResponse>> ruleHistory(@PathVariable String id) {
         return ResponseEntity.ok(referralService.getRuleHistory(id));
     }
@@ -111,11 +122,13 @@ public class AdminReferralController {
     // ---- Payouts ----
 
     @GetMapping("/{id}/payouts")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYOUT_VIEW')")
     public ResponseEntity<List<PayoutResponse>> payouts(@PathVariable String id) {
         return ResponseEntity.ok(referralService.getPayouts(id));
     }
 
     @PostMapping("/{id}/payouts/generate")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYOUT_GENERATE')")
     public ResponseEntity<PayoutResponse> generatePayout(@PathVariable String id,
                                                          @Valid @RequestBody GeneratePayoutRequest request) {
         PayoutResponse response = referralService.generatePayoutRecord(
@@ -124,6 +137,7 @@ public class AdminReferralController {
     }
 
     @GetMapping("/{id}/payouts/preview")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYOUT_VIEW')")
     public ResponseEntity<PayoutResponse> previewPayout(
             @PathVariable String id,
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate fromDate,
@@ -132,11 +146,13 @@ public class AdminReferralController {
     }
 
     @PostMapping("/{id}/payouts/{payoutId}/approve")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYOUT_APPROVE')")
     public ResponseEntity<PayoutResponse> approve(@PathVariable String id, @PathVariable String payoutId) {
         return ResponseEntity.ok(referralService.approvePayoutRecord(payoutId, SecurityUtil.getCurrentUserId()));
     }
 
     @PostMapping("/{id}/payouts/{payoutId}/mark-paid")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYOUT_SETTLE')")
     public ResponseEntity<PayoutResponse> markPaid(@PathVariable String id, @PathVariable String payoutId,
                                                    @Valid @RequestBody MarkPaidRequest request) {
         return ResponseEntity.ok(
@@ -144,6 +160,7 @@ public class AdminReferralController {
     }
 
     @PostMapping("/{id}/payouts/{payoutId}/adjustment")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYOUT_ADJUST')")
     public ResponseEntity<PayoutResponse> adjustment(@PathVariable String id, @PathVariable String payoutId,
                                                      @Valid @RequestBody PayoutAdjustmentRequest request) {
         return ResponseEntity.ok(referralService.addManualAdjustment(
@@ -153,11 +170,13 @@ public class AdminReferralController {
     // ---- Cross-referrer dashboards ----
 
     @GetMapping("/pending-payouts")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('PAYOUT_VIEW')")
     public ResponseEntity<List<PendingPayoutResponse>> pendingPayouts() {
         return ResponseEntity.ok(referralService.getPendingPayouts());
     }
 
     @GetMapping("/milestone-tracker")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('REFERRAL_VIEW')")
     public ResponseEntity<List<MilestoneTrackerItemResponse>> milestoneTracker() {
         return ResponseEntity.ok(referralService.getMilestoneTracker());
     }

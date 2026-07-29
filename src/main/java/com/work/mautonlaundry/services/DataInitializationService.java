@@ -3,30 +3,45 @@ package com.work.mautonlaundry.services;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.model.Permission;
 import com.work.mautonlaundry.data.model.Role;
+import com.work.mautonlaundry.data.model.UserScope;
+import com.work.mautonlaundry.data.model.enums.ScopeLevel;
 import com.work.mautonlaundry.data.repository.PermissionRepository;
 import com.work.mautonlaundry.data.repository.RoleRepository;
 import com.work.mautonlaundry.data.repository.UserRepository;
+import com.work.mautonlaundry.data.repository.UserScopeRepository;
+import com.work.mautonlaundry.security.PermissionEvaluationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
 
 @Service
 public class DataInitializationService implements CommandLineRunner {
-    
+
+    private static final Logger log = LoggerFactory.getLogger(DataInitializationService.class);
+
     @Autowired
     private PermissionRepository permissionRepository;
-    
+
     @Autowired
     private RoleRepository roleRepository;
-    
+
     @Autowired
     private UserRepository userRepository;
-    
+
+    @Autowired
+    private UserScopeRepository userScopeRepository;
+
+    @Autowired
+    private PermissionEvaluationService permissionEvaluationService;
+
     @Autowired
     private PasswordEncoder passwordEncoder;
 
@@ -41,6 +56,15 @@ public class DataInitializationService implements CommandLineRunner {
         initializePermissions();
         initializeRoles();
         initializeAdminUser();
+
+        // Last, and only after the grants above are settled. Redis survives a
+        // deploy, so a permission set cached before this boot would otherwise
+        // linger for the cache TTL — long enough to deny an admin an endpoint
+        // whose permission this very startup just granted them.
+        long flushed = permissionEvaluationService.invalidateAll();
+        if (flushed > 0) {
+            log.info("Flushed {} cached permission set(s) after startup sync", flushed);
+        }
     }
     
     private void initializePermissions() {
@@ -163,21 +187,61 @@ public class DataInitializationService implements CommandLineRunner {
             return;
         }
 
-        if (userRepository.existsByEmail(bootstrapAdminEmail)) {
+        // Trim once. The existence check used to read the raw property while the
+        // insert wrote a trimmed one, so a stray space in BOOTSTRAP_ADMIN_EMAIL
+        // meant the check never matched and every boot retried the insert.
+        String email = bootstrapAdminEmail.trim();
+
+        AppUser adminUser = userRepository.findUserByEmail(email).orElse(null);
+
+        if (adminUser == null) {
+            adminUser = new AppUser();
+            adminUser.setEmail(email);
+            adminUser.setPassword(passwordEncoder.encode(bootstrapAdminPassword));
+            adminUser.setFull_name("Bootstrap Admin");
+            adminUser.setPhone_number("0000000000");
+            adminUser.setEmailVerified(true);
+
+            Role adminRole = roleRepository.findByName("ADMIN")
+                    .orElseThrow(() -> new RuntimeException("ADMIN role not found"));
+            adminUser.setRole(adminRole);
+
+            adminUser = userRepository.save(adminUser);
+        }
+
+        // Runs for an existing admin too, not just a freshly created one: the
+        // early return this replaced meant an admin created after
+        // V17__seed_user_scope.sql never got a scope at all.
+        ensureNationalScope(adminUser);
+    }
+
+    /**
+     * Guarantees the bootstrap admin has a data scope
+     * (Permission Architecture V2, spec §5).
+     *
+     * <p>ScopeFilterService is closed-by-default: a user with no user_scope row
+     * sees nothing. V17 seeds the admins that existed when it ran, but the
+     * bootstrap admin can be created after it — on a newly provisioned
+     * environment, that would produce an administrator who can see none of the
+     * system they are meant to administer, with no error to explain why.
+     *
+     * <p>Never overwrites an existing row. If an admin has been narrowed to,
+     * say, STATE scope deliberately, a reboot must not silently promote them
+     * back to NATIONAL. Same rule as V17's ON CONFLICT DO NOTHING: a human
+     * decision beats a default.
+     */
+    private void ensureNationalScope(AppUser admin) {
+        if (admin.getId() == null || userScopeRepository.existsById(admin.getId())) {
             return;
         }
 
-        AppUser adminUser = new AppUser();
-        adminUser.setEmail(bootstrapAdminEmail.trim());
-        adminUser.setPassword(passwordEncoder.encode(bootstrapAdminPassword));
-        adminUser.setFull_name("Bootstrap Admin");
-        adminUser.setPhone_number("0000000000");
-        adminUser.setEmailVerified(true);
+        UserScope scope = new UserScope();
+        scope.setUserId(admin.getId());
+        scope.setScopeLevel(ScopeLevel.NATIONAL);
+        // assigned_by stays null, meaning system-seeded (see V15).
+        scope.setAssignedAt(LocalDateTime.now());
+        userScopeRepository.save(scope);
 
-        Role adminRole = roleRepository.findByName("ADMIN")
-                .orElseThrow(() -> new RuntimeException("ADMIN role not found"));
-        adminUser.setRole(adminRole);
-
-        userRepository.save(adminUser);
+        log.info("Assigned NATIONAL scope to bootstrap admin {}", admin.getEmail());
     }
 }

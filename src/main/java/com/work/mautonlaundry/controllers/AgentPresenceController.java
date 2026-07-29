@@ -20,7 +20,7 @@ public class AgentPresenceController {
     private final TrackingService trackingService;
 
     @PostMapping({"/api/v1/agents/online", "/agents/online"})
-    @PreAuthorize("hasRole('DELIVERY_AGENT') or hasRole('LAUNDRY_AGENT')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_PRESENCE_UPDATE')")
     public ResponseEntity<MessageResponse> markOnline() {
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
         trackingService.markAgentOnline(currentUser.getId());
@@ -28,7 +28,7 @@ public class AgentPresenceController {
     }
 
     @PostMapping({"/api/v1/agents/offline", "/agents/offline"})
-    @PreAuthorize("hasRole('DELIVERY_AGENT') or hasRole('LAUNDRY_AGENT')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_PRESENCE_UPDATE')")
     public ResponseEntity<MessageResponse> markOffline() {
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();
         trackingService.markAgentOffline(currentUser.getId());
@@ -36,7 +36,7 @@ public class AgentPresenceController {
     }
 
     @PostMapping({"/api/v1/agents/location", "/agents/location"})
-    @PreAuthorize("hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('AGENT_LOCATION_UPDATE')")
     public ResponseEntity<MessageResponse> updateAvailabilityLocation(
             @Valid @RequestBody AgentAvailabilityLocationRequest request) {
         AppUser currentUser = SecurityUtil.getCurrentUser().orElseThrow();

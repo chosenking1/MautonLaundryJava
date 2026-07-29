@@ -31,7 +31,7 @@ public class TrackingController {
     private final BookingRepository bookingRepository;
 
     @GetMapping("/{bookingId}")
-    @PreAuthorize("hasAuthority('BOOKING_READ')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('BOOKING_READ')")
     public ResponseEntity<LiveLocationResponse> getLatestLocation(@PathVariable String bookingId) {
         Booking booking = bookingRepository.findByIdAndDeletedFalse(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
@@ -62,7 +62,7 @@ public class TrackingController {
      * Replaces the STOMP SEND path on the rider side — see TrackingService.handleHttpLocationUpdate.
      */
     @PostMapping("/{bookingId}/location")
-    @PreAuthorize("hasRole('DELIVERY_AGENT')")
+    @PreAuthorize("@permissionEvaluationService.currentUserHasPermission('TRACKING_LOCATION_POST')")
     public ResponseEntity<MessageResponse> postLocation(
             @PathVariable String bookingId,
             @RequestBody Map<String, Object> body) {

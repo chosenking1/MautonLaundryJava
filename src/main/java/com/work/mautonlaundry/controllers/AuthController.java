@@ -111,12 +111,6 @@ public class AuthController {
         return ResponseEntity.badRequest().body("Invalid or expired token");
     }
 
-    @GetMapping("/reset-password")
-    public ResponseEntity<String> resetPasswordGet(@RequestParam String token) {
-        log.info("Password reset page accessed with token via GET");
-        return ResponseEntity.ok("Token valid. Use POST /api/auth/reset-password with the token to set new password.");
-    }
-
     @PostMapping("/forgot-password")
     public ResponseEntity<String> forgotPassword(@RequestParam @NotBlank String email) {
         log.info("Password reset requested");
