@@ -32,7 +32,10 @@ build/
 ### VS Code ###
 .vscode/
 /uploads
-/src/test
+# NOTE: /src/test was ignored here, which kept the entire test suite -- 24 files,
+# 170 tests -- out of version control and alive only on one laptop. Same failure
+# as the blanket *.sql rule below: a broad ignore silently excluding the files
+# that matter most. Tests are tracked.
 *.docx
 *.md
 *.db
