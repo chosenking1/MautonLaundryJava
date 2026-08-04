@@ -78,6 +78,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private AuditService auditService;
 
     @Autowired
+    private ScopeProvisioningService scopeProvisioningService;
+
+    @Autowired
     @Lazy
     private ReferralService referralService;
 
@@ -294,7 +297,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         
         user.setRole(role);
 
-        userRepository.save(user);
+        AppUser savedRoleChange = userRepository.save(user);
+        // A role grants permissions but no data scope; without this an admin
+        // promoted here holds every permission and can see nothing.
+        scopeProvisioningService.ensureScopeForRole(savedRoleChange);
     }
 
     @Override
