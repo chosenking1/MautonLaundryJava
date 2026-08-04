@@ -124,9 +124,22 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         // Save user first
         AppUser savedUser = userRepository.save(user);
         
-        // Create address only if street or city is provided
-        if ((request.getStreet() != null && !request.getStreet().trim().isEmpty()) || 
-            (request.getCity() != null && !request.getCity().trim().isEmpty())) {
+        // Create address only if street or city is provided -- and only with
+        // coordinates. The other route in, POST /api/v1/addresses, now requires
+        // them; without the same rule here, registration would remain a way to
+        // create an address that dispatch can never use, and the customer would
+        // not find out until their first booking refused to select it. Signup
+        // itself is never blocked: the address is simply skipped, and the app
+        // collects it properly (with the map) at booking time.
+        boolean hasAddressFields =
+                (request.getStreet() != null && !request.getStreet().trim().isEmpty())
+                        || (request.getCity() != null && !request.getCity().trim().isEmpty());
+        boolean hasCoordinates = request.getLatitude() != null && request.getLongitude() != null;
+        if (hasAddressFields && !hasCoordinates) {
+            log.warn("Skipping address at registration for {}: no coordinates supplied, "
+                    + "an address without a pin cannot be dispatched", savedUser.getEmail());
+        }
+        if (hasAddressFields && hasCoordinates) {
             Address address = new Address();
             address.setUser(savedUser);
             address.setStreet(request.getStreet());
