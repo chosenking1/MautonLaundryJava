@@ -41,6 +41,13 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     @Async
+    public void sendWelcomeEmail(String email, String firstName) {
+        String subject = "Welcome to " + fromName;
+        sendEmail(email, subject, buildWelcomeEmailBody(firstName));
+    }
+
+    @Override
+    @Async
     public void sendPasswordResetEmail(String email, String token) {
         // Point at the public HTML reset page (which renders a working new-password form),
         // not the JSON API endpoint.
@@ -162,7 +169,7 @@ public class EmailServiceImpl implements EmailService {
                 + "</td></tr>"
                 + "<tr><td style=\"padding:16px 24px 24px 24px;border-top:1px solid #E5E7EB;\">"
                 + "<p style=\"margin:0;font-size:12px;color:#6B7280;\">"
-                + fromName + " &middot; laundry, collected and returned</p>"
+                + fromName + ", Outsource the dirty work.</p>"
                 + "</td></tr>"
                 + "</table></td></tr></table></body></html>";
     }
@@ -189,6 +196,25 @@ public class EmailServiceImpl implements EmailService {
                 + text + "</p>";
     }
 
+    /**
+     * A numbered step. A table rather than a list or flex row because Outlook
+     * renders neither reliably, and the number must stay beside its text.
+     */
+    private String step(String number, String title, String detail) {
+        return "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" "
+                + "style=\"margin:0 0 14px 0;\"><tr>"
+                + "<td width=\"32\" valign=\"top\" style=\"padding:0 12px 0 0;\">"
+                + "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\">"
+                + "<tr><td align=\"center\" width=\"26\" height=\"26\" "
+                + "style=\"background:#EEF2F8;border-radius:13px;font-size:13px;font-weight:700;"
+                + "color:#1A3A6B;\">" + number + "</td></tr></table></td>"
+                + "<td valign=\"top\">"
+                + "<p style=\"margin:0 0 2px 0;font-size:15px;font-weight:600;color:#1A1A2E;\">"
+                + title + "</p>"
+                + "<p style=\"margin:0;font-size:14px;line-height:1.5;color:#4B5563;\">"
+                + detail + "</p></td></tr></table>";
+    }
+
     /** A copyable URL, for clients that strip the button. */
     private String fallbackLink(String url) {
         return "<p style=\"margin:0 0 6px 0;font-size:13px;color:#6B7280;\">"
@@ -204,7 +230,36 @@ public class EmailServiceImpl implements EmailService {
                         + primaryButton(verificationUrl, "Confirm email")
                         + fallbackLink(verificationUrl)
                         + note("This link works for 24 hours.")
-                        + note("If you did not create an Imototo account, you can ignore this email."));
+                        + note("If you did not create a " + fromName
+                                + " account, you can ignore this email."));
+    }
+
+    /**
+     * The first email that is not asking for anything.
+     *
+     * <p>Deliberately short and only about what exists today: book a collection,
+     * follow it, ask for help. No feature is promised here that a new user cannot
+     * find in the app on the day they read this.
+     */
+    private String buildWelcomeEmailBody(String firstName) {
+        String greeting = firstName == null || firstName.isBlank()
+                ? "You're all set."
+                : "You're all set, " + firstName + ".";
+        return emailShell(
+                greeting,
+                para("Your email is confirmed, so your " + fromName
+                        + " account is ready. Here is how it works.")
+                        + step("1", "Add your address",
+                                "Drop a pin on the map so your rider arrives at the right gate, "
+                                        + "not the right street.")
+                        + step("2", "Book a collection",
+                                "Choose what needs cleaning and when you want it picked up.")
+                        + step("3", "Follow it in the app",
+                                "You'll see each stage as it happens, from collection to the "
+                                        + "moment it's back with you.")
+                        + note("Something not right with an order? Use Help &amp; Support in the "
+                                + "app and a person will read it.")
+                        + note("Welcome aboard."));
     }
 
     private String buildPasswordResetEmailBody(String resetUrl) {

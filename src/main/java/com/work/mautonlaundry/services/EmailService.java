@@ -2,6 +2,17 @@ package com.work.mautonlaundry.services;
 
 public interface EmailService {
     void sendVerificationEmail(String email, String token);
+
+    /**
+     * Sent once, after an address is actually confirmed. Separate from the
+     * verification mail on purpose: that one has a job to do and anything else in
+     * it competes with the button.
+     *
+     * @param firstName may be null or blank; the greeting degrades to no name
+     *                  rather than "Hi null".
+     */
+    void sendWelcomeEmail(String email, String firstName);
+
     void sendPasswordResetEmail(String email, String token);
     /**
      * @param message a sentence already written for the customer, not a status

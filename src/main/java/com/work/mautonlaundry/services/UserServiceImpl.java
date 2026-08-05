@@ -355,15 +355,29 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         }
         
         AppUser user = verificationToken.getUser();
+        // Whether this is the first time this address has been confirmed decides
+        // whether a welcome email goes out. Read it before the flag is set: a user
+        // who verifies, then clicks a second still-valid link, should not be
+        // welcomed twice.
+        boolean firstVerification = !Boolean.TRUE.equals(user.getEmailVerified());
         user.setEmailVerified(true);
         userRepository.save(user);
-        
+
         // Manual cache eviction
         cacheManager.getCache("users").evict(user.getEmail().toLowerCase());
-        
+
         verificationToken.setUsed(true);
         tokenRepository.save(verificationToken);
-        
+
+        if (firstVerification) {
+            // After commit, like the other outbound mail: an email cannot be
+            // rolled back, so welcoming someone whose verification then failed to
+            // persist would leave them holding a mail for an unverified account.
+            String email = user.getEmail();
+            String firstName = DeliveryService.firstNameOf(user);
+            sendAfterCommit(() -> emailService.sendWelcomeEmail(email, firstName));
+        }
+
         return true;
     }
 
