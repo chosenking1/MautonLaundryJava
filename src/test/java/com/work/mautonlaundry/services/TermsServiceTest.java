@@ -36,6 +36,7 @@ class TermsServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(service, "currentVersion", CURRENT);
+        ReflectionTestUtils.setField(service, "bodyCache", new java.util.concurrent.ConcurrentHashMap<String, String>());
         user = new AppUser();
         user.setId("u1");
         user.setEmail("customer@example.com");
@@ -86,6 +87,21 @@ class TermsServiceTest {
 
         when(repository.existsByUserAndVersion(eq(user), eq(CURRENT))).thenReturn(false);
         assertThat(service.needsAcceptance(user)).isTrue();
+    }
+
+    @Test
+    void theBodyIsServedFromTheBuild() {
+        // The apps render this; there is no website to depend on.
+        String text = service.body(CURRENT);
+        assertThat(text).isNotEmpty();
+        assertThat(text).contains("Imototo");
+    }
+
+    @Test
+    void anUnknownVersionYieldsEmptyRatherThanThrowing() {
+        // A client asking for a version we no longer ship must get a clean
+        // "not found", not a 500.
+        assertThat(service.body("1999-01-01")).isEmpty();
     }
 
     @Test

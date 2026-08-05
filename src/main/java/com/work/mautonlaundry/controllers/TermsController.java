@@ -28,6 +28,24 @@ public class TermsController {
         Map<String, String> body = new HashMap<>();
         body.put("version", termsService.currentVersion());
         body.put("url", termsService.termsUrl());
+        body.put("body", termsService.body(termsService.currentVersion()));
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * A specific historical version. Needed to show what a customer actually
+     * agreed to when their acceptance names an older version than the current
+     * one -- which is the whole reason acceptances record a version at all.
+     */
+    @GetMapping("/{version}")
+    public ResponseEntity<Map<String, String>> byVersion(@PathVariable String version) {
+        String text = termsService.body(version);
+        if (text.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Map<String, String> body = new HashMap<>();
+        body.put("version", version);
+        body.put("body", text);
         return ResponseEntity.ok(body);
     }
 
