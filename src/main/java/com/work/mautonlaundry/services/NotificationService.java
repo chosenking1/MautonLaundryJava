@@ -22,14 +22,16 @@ public class NotificationService {
     }
 
     public void notifyBookingStatusChange(String userEmail, String bookingId, String oldStatus, String newStatus) {
-        String message = String.format("Booking %s status changed from %s to %s", bookingId, oldStatus, newStatus);
-        dispatchNotification(userEmail, bookingId, message);
+        // Was "status changed from X to Y" with the raw enum names, which is how
+        // "DELIVERED_TO_LAUNDRY" reached customers. Nobody outside this codebase
+        // needs the previous state either -- they need to know what just happened.
+        dispatchNotification(userEmail, bookingId, CustomerStatusText.forStatus(newStatus));
     }
 
     public void notifyUserBookingStatusChange(String userEmail, String bookingId, String oldStatus, String newStatus) {
-        String statusDescription = formatStatusDescription(newStatus);
-        String message = String.format("Your booking #%s status has been updated to: %s", bookingId, statusDescription);
-        dispatchNotification(userEmail, bookingId, message);
+        // "Your booking #<uuid> status has been updated to: At Laundry" told the
+        // customer a label and an identifier. This tells them what happened.
+        dispatchNotification(userEmail, bookingId, CustomerStatusText.forStatus(newStatus));
     }
 
     public void notifyUserLaundrymanAssigned(String userEmail, String bookingId, String laundrymanName) {
@@ -183,6 +185,11 @@ public class NotificationService {
         });
     }
 
+    /**
+     * Superseded by {@link CustomerStatusText}. Kept only for any caller still
+     * wanting a short label rather than a sentence.
+     */
+    @SuppressWarnings("unused")
     private String formatStatusDescription(String status) {
         return switch (status) {
             case "CREATED" -> "Order Placed";

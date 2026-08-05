@@ -53,7 +53,9 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async
     public void sendBookingNotification(String email, String bookingId, String status) {
-        String subject = "Booking Update - " + fromName;
+        // Every update used the same subject, so a customer's inbox filled with
+        // identical lines and they had to open each one to learn anything.
+        String subject = deriveSubject(status) + " - " + fromName;
         String body = buildBookingNotificationBody(bookingId, status);
         sendEmail(email, subject, body);
     }
@@ -159,18 +161,64 @@ public class EmailServiceImpl implements EmailService {
                 "</html>";
     }
 
-    private String buildBookingNotificationBody(String bookingId, String status) {
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>Booking Update</h2>" +
-                "<p>Your booking status has been updated.</p>" +
-                "<p><strong>Booking ID:</strong> " + bookingId + "</p>" +
-                "<p><strong>Status:</strong> " + status + "</p>" +
-                "<p>You can track your order in your account dashboard.</p>" +
-                "<p>Thank you for choosing " + fromName + "!</p>" +
-                "<p>Best regards,<br>The " + fromName + " Team</p>" +
-                "</body>" +
-                "</html>";
+    /**
+     * The order-update email.
+     *
+     * <p>Rewritten because the old one printed "Status: DELIVERED_TO_LAUNDRY"
+     * beneath a full booking UUID -- internal vocabulary and an internal
+     * identifier, neither of which means anything to a customer. It now leads
+     * with a sentence about what happened and carries a short reference they
+     * could actually quote to support.
+     *
+     * <p>Inline styles and a table shell rather than modern CSS: email clients
+     * strip stylesheets and flexbox, and a layout that survives Gmail and
+     * Outlook matters more here than elegance.
+     */
+    /**
+     * A subject drawn from the message itself. The notification layer sends a
+     * finished sentence, so the first clause is the news.
+     */
+    private String deriveSubject(String message) {
+        if (message == null || message.isBlank()) return "Order update";
+        String firstSentence = message.split("(?<=[.!?])\\s", 2)[0].trim();
+        if (firstSentence.endsWith(".")) {
+            firstSentence = firstSentence.substring(0, firstSentence.length() - 1);
+        }
+        return firstSentence.length() > 60 ? "Order update" : firstSentence;
+    }
+
+    private String buildBookingNotificationBody(String bookingId, String message) {
+        String reference = bookingId == null || bookingId.length() < 8
+                ? bookingId
+                : bookingId.substring(0, 8).toUpperCase();
+        return "<html><body style=\"margin:0;padding:0;background:#F5F7FA;\">"
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
+                + "style=\"background:#F5F7FA;padding:24px 12px;\"><tr><td align=\"center\">"
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
+                + "style=\"max-width:520px;background:#FFFFFF;border-radius:12px;overflow:hidden;"
+                + "font-family:'Segoe UI',Helvetica,Arial,sans-serif;\">"
+                // header
+                + "<tr><td style=\"background:#1A3A6B;padding:20px 24px;\">"
+                + "<span style=\"color:#FFFFFF;font-size:18px;font-weight:700;letter-spacing:0.3px;\">"
+                + fromName + "</span></td></tr>"
+                // body
+                + "<tr><td style=\"padding:28px 24px 8px 24px;\">"
+                + "<p style=\"margin:0 0 16px 0;font-size:16px;line-height:1.55;color:#1A1A2E;\">"
+                + message + "</p>"
+                + "<p style=\"margin:0 0 4px 0;font-size:13px;color:#6B7280;\">"
+                + "Order reference</p>"
+                + "<p style=\"margin:0 0 20px 0;font-size:15px;font-weight:600;color:#1A3A6B;\">"
+                + reference + "</p>"
+                + "<p style=\"margin:0 0 24px 0;font-size:14px;line-height:1.55;color:#6B7280;\">"
+                + "You can follow your order in the Imototo app at any time. If something does not "
+                + "look right, reply to this email or use Help &amp; Support in the app.</p>"
+                + "</td></tr>"
+                // footer
+                + "<tr><td style=\"padding:16px 24px 24px 24px;border-top:1px solid #E5E7EB;\">"
+                + "<p style=\"margin:0;font-size:12px;color:#6B7280;\">"
+                + fromName + " &middot; laundry, collected and returned</p>"
+                + "</td></tr>"
+                + "</table></td></tr></table></body></html>";
     }
 
     private String buildAgentApplicationSubmittedBody(String roleName, int locationsCount, String adminTeamEmail) {
