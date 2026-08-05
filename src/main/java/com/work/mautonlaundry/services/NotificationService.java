@@ -44,6 +44,12 @@ public class NotificationService {
         dispatchNotification(userEmail, bookingId, "Booking created successfully");
     }
 
+    /** Staff have replied to a complaint. */
+    public void notifySupportReply(String userEmail, String ticketId, String subject) {
+        dispatchNotification(userEmail, ticketId,
+                "We've replied to your message about \"" + subject + "\". Open Help & Support to read it.");
+    }
+
     public void notifyBookingCompleted(String userEmail, String bookingId) {
         dispatchNotification(userEmail, bookingId, "Booking completed");
     }
