@@ -81,6 +81,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private ScopeProvisioningService scopeProvisioningService;
 
     @Autowired
+    private TermsService termsService;
+
+    @Autowired
     @Lazy
     private ReferralService referralService;
 
@@ -165,6 +168,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         } catch (Exception ex) {
             log.warn("Referral attribution skipped for {}: {}", savedUser.getEmail(), ex.getMessage());
         }
+
+        // Record consent as part of creating the account, in the same
+        // transaction: an account that exists with no record of what its owner
+        // agreed to is the gap this closes.
+        termsService.record(savedUser, request.getAcceptedTermsVersion(), "REGISTRATION", null);
 
         auditService.logAction("CREATE", "USER", savedUser.getEmail());
         registerResponse.setEmail(savedUser.getEmail());

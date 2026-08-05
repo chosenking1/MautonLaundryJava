@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class UserController {
+
+    private final com.work.mautonlaundry.services.TermsService termsService;
     
     private final UserRepository userRepository;
     private final PermissionEvaluationService permissionEvaluationService;
@@ -34,6 +36,8 @@ public class UserController {
         // Effective permissions, so the admin portal can gate pages by permission
         // (the dimension the API enforces) rather than by role alone.
         response.setPermissions(permissionEvaluationService.getEffectivePermissions(currentUser.getId()));
+        response.setCurrentTermsVersion(termsService.currentVersion());
+        response.setTermsAcceptanceRequired(termsService.needsAcceptance(currentUser));
         response.setIsFirstLogin(currentUser.getIsFirstLogin());
         response.setEmailVerified(currentUser.getEmailVerified());
         response.setAddresses(currentUser.getAddresses());

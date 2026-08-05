@@ -25,6 +25,13 @@ public class CurrentUserResponse {
      * reach the page for it.
      */
     private java.util.Set<String> permissions;
+    /**
+     * True when the terms have changed since this user last agreed. Lets a client
+     * prompt for re-acceptance instead of the change passing silently.
+     */
+    private Boolean termsAcceptanceRequired;
+    private String currentTermsVersion;
+
     private Boolean isFirstLogin;
     private Boolean emailVerified;
     private List<Address> addresses;
