@@ -107,4 +107,20 @@ public interface BookingRepository extends JpaRepository<Booking, String>,
             "AND b.createdAt >= :start AND b.createdAt < :end GROUP BY b.user.id")
     List<Object[]> aggregateOrdersPerCustomerInPeriod(@Param("start") LocalDateTime start,
                                                       @Param("end") LocalDateTime end);
+    /**
+     * Bookings held for a future pickup window, oldest window first.
+     *
+     * <p>Matches the partial index from V31. Cancelled bookings are included on
+     * purpose -- the releaser marks them released so they stop being scanned,
+     * which an exclusion here would leave to accumulate forever.
+     */
+    @Query("SELECT b FROM Booking b LEFT JOIN FETCH b.pickupSlot "
+            + "WHERE b.deleted = false AND b.pickupReleasedAt IS NULL "
+            + "AND b.scheduledPickupDate IS NOT NULL "
+            + "ORDER BY b.scheduledPickupDate ASC")
+    List<Booking> findAwaitingScheduledPickup();
+    /** Held bookings still pointing at a window, used to guard retiring it. */
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.deleted = false "
+            + "AND b.pickupReleasedAt IS NULL AND b.pickupSlot.id = :slotId")
+    long countAwaitingScheduledPickupInSlot(@Param("slotId") String slotId);
 }

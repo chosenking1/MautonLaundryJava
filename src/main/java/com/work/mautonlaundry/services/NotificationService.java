@@ -42,8 +42,16 @@ public class NotificationService {
         dispatchNotification(userEmail, bookingId, message);
     }
 
-    public void notifyBookingCreated(String userEmail, String bookingId) {
-        dispatchNotification(userEmail, bookingId, "Booking created successfully");
+    /**
+     * @param pickupWindow the window the customer chose, or null for "collect
+     *                     now". A held booking must not be told we are already
+     *                     looking for a rider -- it is deliberately not.
+     */
+    public void notifyBookingCreated(String userEmail, String bookingId, String pickupWindow) {
+        dispatchNotification(userEmail, bookingId,
+                pickupWindow == null || pickupWindow.isBlank()
+                        ? CustomerStatusText.forStatus("CREATED")
+                        : CustomerStatusText.forScheduledPickup(pickupWindow));
     }
 
     /** Staff have replied to a complaint. */

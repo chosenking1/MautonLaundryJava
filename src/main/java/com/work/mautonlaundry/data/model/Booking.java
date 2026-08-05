@@ -8,6 +8,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -42,6 +43,35 @@ public class Booking {
 
     @Column(name = "return_date")
     private LocalDateTime returnDate;
+
+    /**
+     * The day the customer asked to be collected on, or null to be collected
+     * now.
+     *
+     * <p>Null is the old behaviour and stays supported: APKs already in the wild
+     * send no schedule, and their bookings must keep dispatching immediately.
+     */
+    @Column(name = "scheduled_pickup_date")
+    private LocalDate scheduledPickupDate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pickup_slot_id")
+    private PickupSlot pickupSlot;
+
+    /**
+     * When the hold was lifted and the booking was offered to laundry partners.
+     *
+     * <p>This is what makes the release sweep idempotent -- it can run twice, or
+     * again after a restart, without re-offering a booking that is already out.
+     */
+    @Column(name = "pickup_released_at")
+    private LocalDateTime pickupReleasedAt;
+
+    /** True while this booking is waiting for its window to open. */
+    @Transient
+    public boolean isAwaitingScheduledPickup() {
+        return scheduledPickupDate != null && pickupReleasedAt == null;
+    }
 
     @Column(nullable = false)
     private Boolean express = false;

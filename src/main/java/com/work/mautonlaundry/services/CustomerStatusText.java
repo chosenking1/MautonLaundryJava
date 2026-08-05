@@ -76,6 +76,24 @@ public final class CustomerStatusText {
     }
 
     /**
+     * What to tell a customer whose booking is waiting for a window they chose.
+     *
+     * <p>Such a booking sits in CREATED, and CREATED says we are finding a
+     * laundry partner nearby -- true for a booking placed for now, a lie for one
+     * held until Thursday. Someone who is told we are looking, and then hears
+     * nothing for two days, reasonably concludes we lost it.
+     *
+     * @param window a phrase like "Thursday, Morning 8:00 - 12:00"
+     */
+    public static String forScheduledPickup(String window) {
+        if (window == null || window.isBlank()) {
+            return "Your pickup is booked. We'll be in touch before we set off.";
+        }
+        return "Your pickup is booked for " + window
+                + ". We'll arrange a rider closer to the time.";
+    }
+
+    /**
      * A short heading for the same event, for an email subject or a push title.
      * Still a phrase, never a status name.
      */

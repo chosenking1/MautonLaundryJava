@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -26,6 +27,12 @@ public class BookingDetailsResponse {
     private Boolean express;
     private LocalDateTime returnDate;
     private LocalDateTime createdAt;
+
+    /** The chosen pickup window, and whether this booking is still waiting for it. */
+    private LocalDate scheduledPickupDate;
+    private String pickupSlotId;
+    private String pickupWindow;
+    private Boolean awaitingScheduledPickup;
     private String laundryAgentId;
     private String pickupAgentId;
     private String returnAgentId;

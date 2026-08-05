@@ -63,6 +63,7 @@ public class BookingService {
     private final HandoffCodeRepository handoffCodeRepository;
     private final HandoffCodeService handoffCodeService;
     private final BookingStatusHistoryRepository bookingStatusHistoryRepository;
+    private final PickupSchedulingService pickupSchedulingService;
 
     @Transactional
     public CreateBookingResponse createBooking(CreateBookingRequest request, String idempotencyKey) {
@@ -99,6 +100,16 @@ public class BookingService {
         booking.setTrackingNumber(generateTrackingNumber());
         booking.setReturnDate(calculateReturnDate(request.getExpress()));
         booking.setStatus(BookingStatus.CREATED);
+
+        // Refused here rather than trusted from the client: every window is a
+        // promise about a rider's time, and the app is only the polite half of
+        // the rule. Null slot means no schedule -- collect now, as before.
+        PickupSlot pickupSlot = pickupSchedulingService.validateChoice(
+                request.getScheduledPickupDate(), request.getPickupSlotId());
+        if (pickupSlot != null) {
+            booking.setScheduledPickupDate(request.getScheduledPickupDate());
+            booking.setPickupSlot(pickupSlot);
+        }
         
         // Create and add booking items
         createBookingItems(booking, request.getItems());
@@ -111,9 +122,25 @@ public class BookingService {
         // client uses the returned CreateBookingResponse to initiate payment.
         applyDiscountIfPresent(savedBooking, request.getDiscountCode(), totalPrice, currentUser.getId());
 
-        laundryAssignmentService.createLaundryOffers(savedBooking);
+        // A booking scheduled for later is held here rather than offered now.
+        // This is the whole of the hold: everything downstream -- laundry
+        // offers, rider dispatch, the reconciler -- starts from this call, so
+        // not making it is enough, and ScheduledPickupReleaser makes it later.
+        if (pickupSlot == null || pickupSchedulingService.isDueForRelease(
+                savedBooking.getScheduledPickupDate(), pickupSlot)) {
+            savedBooking.setPickupReleasedAt(LocalDateTime.now());
+            bookingRepository.save(savedBooking);
+            laundryAssignmentService.createLaundryOffers(savedBooking);
+        } else {
+            log.info("Booking {} held until {} for its {} pickup window",
+                    savedBooking.getId(),
+                    pickupSchedulingService.releaseAt(savedBooking.getScheduledPickupDate(), pickupSlot),
+                    pickupSlot.getLabel());
+        }
         savedBooking = bookingRepository.findById(savedBooking.getId()).orElse(savedBooking);
-        notificationService.notifyBookingCreated(savedBooking.getUser().getEmail(), savedBooking.getId());
+        notificationService.notifyBookingCreated(savedBooking.getUser().getEmail(), savedBooking.getId(),
+                pickupSchedulingService.describeWindow(
+                        savedBooking.getScheduledPickupDate(), pickupSlot));
         
         auditService.logAction("CREATE", "BOOKING", savedBooking.getId());
         
@@ -189,6 +216,7 @@ public class BookingService {
         response.setExpress(booking.getExpress());
         response.setReturnDate(booking.getReturnDate());
         response.setCreatedAt(booking.getCreatedAt());
+        applyPickupWindow(response, booking);
 
         
         // Map address
@@ -424,6 +452,7 @@ public class BookingService {
             response.setDiscountCode(booking.getDiscountCode());
             response.setReturnDate(booking.getReturnDate());
             response.setCreatedAt(booking.getCreatedAt());
+            applyPickupWindow(response, booking);
             response.setItems(mapBookingItems(booking));
 
             if (booking.getPickupAddress() != null) {
@@ -604,7 +633,30 @@ public class BookingService {
         response.setDiscountCode(booking.getDiscountCode());
         response.setReturnDate(booking.getReturnDate());
         response.setStatus(booking.getStatus().name());
+        response.setScheduledPickupDate(booking.getScheduledPickupDate());
+        if (booking.getPickupSlot() != null) {
+            response.setPickupSlotId(booking.getPickupSlot().getId());
+            response.setPickupWindow(pickupSchedulingService.describeWindow(
+                    booking.getScheduledPickupDate(), booking.getPickupSlot()));
+        }
         return response;
+    }
+
+    /**
+     * Copies the chosen pickup window onto a response.
+     *
+     * <p>One place, because a booking that says it is coming Thursday morning in
+     * the list and gives no window on the detail screen reads as a bug to the
+     * person who chose it.
+     */
+    private void applyPickupWindow(BookingDetailsResponse response, Booking booking) {
+        response.setScheduledPickupDate(booking.getScheduledPickupDate());
+        response.setAwaitingScheduledPickup(booking.isAwaitingScheduledPickup());
+        if (booking.getPickupSlot() != null) {
+            response.setPickupSlotId(booking.getPickupSlot().getId());
+            response.setPickupWindow(pickupSchedulingService.describeWindow(
+                    booking.getScheduledPickupDate(), booking.getPickupSlot()));
+        }
     }
 
     private String resolveIdempotencyKey(String rawKey) {
