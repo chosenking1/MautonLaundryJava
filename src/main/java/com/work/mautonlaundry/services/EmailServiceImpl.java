@@ -52,11 +52,11 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     @Async
-    public void sendBookingNotification(String email, String bookingId, String status) {
+    public void sendBookingNotification(String email, String bookingId, String message) {
         // Every update used the same subject, so a customer's inbox filled with
         // identical lines and they had to open each one to learn anything.
-        String subject = deriveSubject(status) + " - " + fromName;
-        String body = buildBookingNotificationBody(bookingId, status);
+        String subject = deriveSubject(message) + " - " + fromName;
+        String body = buildBookingNotificationBody(bookingId, message);
         sendEmail(email, subject, body);
     }
 
@@ -131,56 +131,102 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
+    /**
+     * The shared shell every customer-facing email sits in: navy header, white
+     * card, quiet footer.
+     *
+     * <p>One shell rather than nine hand-rolled pages. The templates had drifted
+     * into different fonts, colours and button styles -- the verification button
+     * was green, which belongs to no part of the brand -- and each new email
+     * copied whichever one the author happened to look at.
+     *
+     * <p>Inline styles on a table shell, deliberately: mail clients strip
+     * stylesheets and do not implement flexbox, so surviving Gmail and Outlook
+     * matters more here than writing modern CSS.
+     */
+    private String emailShell(String heading, String innerHtml) {
+        return "<html><body style=\"margin:0;padding:0;background:#F5F7FA;\">"
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
+                + "style=\"background:#F5F7FA;padding:24px 12px;\"><tr><td align=\"center\">"
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
+                + "style=\"max-width:520px;background:#FFFFFF;border-radius:12px;overflow:hidden;"
+                + "font-family:'Segoe UI',Helvetica,Arial,sans-serif;\">"
+                + "<tr><td style=\"background:#1A3A6B;padding:20px 24px;\">"
+                + "<span style=\"color:#FFFFFF;font-size:18px;font-weight:700;letter-spacing:0.3px;\">"
+                + fromName + "</span></td></tr>"
+                + "<tr><td style=\"padding:28px 24px 8px 24px;\">"
+                + (heading == null || heading.isBlank() ? ""
+                        : "<h1 style=\"margin:0 0 12px 0;font-size:20px;font-weight:700;color:#1A1A2E;\">"
+                                + heading + "</h1>")
+                + innerHtml
+                + "</td></tr>"
+                + "<tr><td style=\"padding:16px 24px 24px 24px;border-top:1px solid #E5E7EB;\">"
+                + "<p style=\"margin:0;font-size:12px;color:#6B7280;\">"
+                + fromName + " &middot; laundry, collected and returned</p>"
+                + "</td></tr>"
+                + "</table></td></tr></table></body></html>";
+    }
+
+    /** Brand-navy action button. Table-based so Outlook renders the fill. */
+    private String primaryButton(String url, String label) {
+        return "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" "
+                + "style=\"margin:0 0 20px 0;\"><tr><td "
+                + "style=\"background:#1A3A6B;border-radius:10px;\">"
+                + "<a href=\"" + url + "\" style=\"display:inline-block;padding:13px 26px;"
+                + "font-size:15px;font-weight:600;color:#FFFFFF;text-decoration:none;\">"
+                + label + "</a></td></tr></table>";
+    }
+
+    /** Body copy. */
+    private String para(String text) {
+        return "<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.55;color:#1A1A2E;\">"
+                + text + "</p>";
+    }
+
+    /** Secondary copy: expiry notes, "ignore this if..." lines. */
+    private String note(String text) {
+        return "<p style=\"margin:0 0 12px 0;font-size:13px;line-height:1.55;color:#6B7280;\">"
+                + text + "</p>";
+    }
+
+    /** A copyable URL, for clients that strip the button. */
+    private String fallbackLink(String url) {
+        return "<p style=\"margin:0 0 6px 0;font-size:13px;color:#6B7280;\">"
+                + "If the button does not work, paste this into your browser:</p>"
+                + "<p style=\"margin:0 0 20px 0;font-size:12px;line-height:1.5;"
+                + "word-break:break-all;color:#1A3A6B;\">" + url + "</p>";
+    }
+
     private String buildVerificationEmailBody(String verificationUrl) {
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>Welcome to " + fromName + "!</h2>" +
-                "<p>Thank you for registering. Please verify your email address by clicking the button below:</p>" +
-                "<p><a href='" + verificationUrl + "' style='background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; display: inline-block;'>Verify Email</a></p>" +
-                "<p>Or copy and paste this link in your browser:</p>" +
-                "<p>" + verificationUrl + "</p>" +
-                "<p>This link will expire in 24 hours.</p>" +
-                "<p>If you did not create an account, please ignore this email.</p>" +
-                "<p>Best regards,<br>The " + fromName + " Team</p>" +
-                "</body>" +
-                "</html>";
+        return emailShell(
+                "Confirm your email",
+                para("Thanks for signing up. Confirm this address and your account is ready to use.")
+                        + primaryButton(verificationUrl, "Confirm email")
+                        + fallbackLink(verificationUrl)
+                        + note("This link works for 24 hours.")
+                        + note("If you did not create an Imototo account, you can ignore this email."));
     }
 
     private String buildPasswordResetEmailBody(String resetUrl) {
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>Password Reset Request</h2>" +
-                "<p>We received a request to reset your password. Click the button below to reset it:</p>" +
-                "<p><a href='" + resetUrl + "' style='background-color: #2196F3; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; display: inline-block;'>Reset Password</a></p>" +
-                "<p>Or copy and paste this link in your browser:</p>" +
-                "<p>" + resetUrl + "</p>" +
-                "<p>This link will expire in 1 hour.</p>" +
-                "<p>If you did not request a password reset, please ignore this email.</p>" +
-                "<p>Best regards,<br>The " + fromName + " Team</p>" +
-                "</body>" +
-                "</html>";
+        return emailShell(
+                "Reset your password",
+                para("Use the button below to set a new password. If you did not ask for this, "
+                        + "nothing has changed and you can ignore this email.")
+                        + primaryButton(resetUrl, "Set a new password")
+                        + fallbackLink(resetUrl)
+                        + note("This link works for one hour, and once only.")
+                        + note("If you did not request a reset, we recommend checking that no one "
+                                + "else has access to your inbox."));
     }
 
     /**
-     * The order-update email.
-     *
-     * <p>Rewritten because the old one printed "Status: DELIVERED_TO_LAUNDRY"
-     * beneath a full booking UUID -- internal vocabulary and an internal
-     * identifier, neither of which means anything to a customer. It now leads
-     * with a sentence about what happened and carries a short reference they
-     * could actually quote to support.
-     *
-     * <p>Inline styles and a table shell rather than modern CSS: email clients
-     * strip stylesheets and flexbox, and a layout that survives Gmail and
-     * Outlook matters more here than elegance.
-     */
-    /**
      * A subject drawn from the message itself. The notification layer sends a
-     * finished sentence, so the first clause is the news.
+     * finished sentence, so its first clause is the news -- which beats every
+     * update arriving as an identical "Booking Update" that has to be opened.
      */
     private String deriveSubject(String message) {
         if (message == null || message.isBlank()) return "Order update";
-        String firstSentence = message.split("(?<=[.!?])\\s", 2)[0].trim();
+        String firstSentence = message.split("(?<=[.!?])\s", 2)[0].trim();
         if (firstSentence.endsWith(".")) {
             firstSentence = firstSentence.substring(0, firstSentence.length() - 1);
         }
@@ -191,34 +237,14 @@ public class EmailServiceImpl implements EmailService {
         String reference = bookingId == null || bookingId.length() < 8
                 ? bookingId
                 : bookingId.substring(0, 8).toUpperCase();
-        return "<html><body style=\"margin:0;padding:0;background:#F5F7FA;\">"
-                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
-                + "style=\"background:#F5F7FA;padding:24px 12px;\"><tr><td align=\"center\">"
-                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
-                + "style=\"max-width:520px;background:#FFFFFF;border-radius:12px;overflow:hidden;"
-                + "font-family:'Segoe UI',Helvetica,Arial,sans-serif;\">"
-                // header
-                + "<tr><td style=\"background:#1A3A6B;padding:20px 24px;\">"
-                + "<span style=\"color:#FFFFFF;font-size:18px;font-weight:700;letter-spacing:0.3px;\">"
-                + fromName + "</span></td></tr>"
-                // body
-                + "<tr><td style=\"padding:28px 24px 8px 24px;\">"
-                + "<p style=\"margin:0 0 16px 0;font-size:16px;line-height:1.55;color:#1A1A2E;\">"
-                + message + "</p>"
-                + "<p style=\"margin:0 0 4px 0;font-size:13px;color:#6B7280;\">"
-                + "Order reference</p>"
-                + "<p style=\"margin:0 0 20px 0;font-size:15px;font-weight:600;color:#1A3A6B;\">"
-                + reference + "</p>"
-                + "<p style=\"margin:0 0 24px 0;font-size:14px;line-height:1.55;color:#6B7280;\">"
-                + "You can follow your order in the Imototo app at any time. If something does not "
-                + "look right, reply to this email or use Help &amp; Support in the app.</p>"
-                + "</td></tr>"
-                // footer
-                + "<tr><td style=\"padding:16px 24px 24px 24px;border-top:1px solid #E5E7EB;\">"
-                + "<p style=\"margin:0;font-size:12px;color:#6B7280;\">"
-                + fromName + " &middot; laundry, collected and returned</p>"
-                + "</td></tr>"
-                + "</table></td></tr></table></body></html>";
+        return emailShell(
+                null,
+                para(message)
+                        + "<p style=\"margin:0 0 4px 0;font-size:13px;color:#6B7280;\">Order reference</p>"
+                        + "<p style=\"margin:0 0 20px 0;font-size:15px;font-weight:600;color:#1A3A6B;\">"
+                        + reference + "</p>"
+                        + note("You can follow your order in the Imototo app at any time. If something "
+                                + "does not look right, use Help &amp; Support in the app."));
     }
 
     private String buildAgentApplicationSubmittedBody(String roleName, int locationsCount, String adminTeamEmail) {
