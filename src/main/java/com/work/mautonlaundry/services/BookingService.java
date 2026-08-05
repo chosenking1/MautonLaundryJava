@@ -249,9 +249,11 @@ public class BookingService {
 
         // Contact details for whoever is actually on the road right now. Only an
         // accepted assignment counts: an OFFERED row is a rider who has not taken
-        // the job, and handing out their number would be wrong.
+        // the job, and handing out their number would be wrong. Finished legs are
+        // excluded too -- once the goods have changed hands there is nothing left
+        // to call about, and the prompt only confuses.
         deliveries.stream()
-                .filter(da -> DeliveryAssignmentStatus.activeAssignmentStatuses().contains(da.getStatus()))
+                .filter(da -> DeliveryAssignmentStatus.riderEnRouteStatuses().contains(da.getStatus()))
                 .findFirst()
                 .ifPresent(da -> {
                     AppUser rider = da.getDeliveryAgent();
