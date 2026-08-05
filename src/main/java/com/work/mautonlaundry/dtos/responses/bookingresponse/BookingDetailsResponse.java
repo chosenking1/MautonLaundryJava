@@ -1,7 +1,10 @@
 package com.work.mautonlaundry.dtos.responses.bookingresponse;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -26,6 +29,27 @@ public class BookingDetailsResponse {
     private String laundryAgentId;
     private String pickupAgentId;
     private String returnAgentId;
+
+    /**
+     * The rider currently handling this booking -- first name and number, so the
+     * customer knows who is coming and can reach them.
+     *
+     * <p>Present only while an assignment is live, and only for the booking's
+     * owner and admins. It disappears once the job completes: the customer has
+     * no continuing claim on a rider's personal number.
+     */
+    private DeliveryContactView deliveryContact;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DeliveryContactView {
+        private String name;
+        private String phone;
+        /** PICKUP_FROM_CUSTOMER or RETURN_TO_CUSTOMER -- which leg they are on. */
+        private String phase;
+    }
 
     private AddressInfo pickupAddress;
     private List<BookingItemInfo> items;

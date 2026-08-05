@@ -246,6 +246,21 @@ public class BookingService {
                 .filter(da -> visible.contains(da.getStatus()))
                 .findFirst()
                 .ifPresent(da -> response.setReturnAgentId(da.getDeliveryAgent().getId()));
+
+        // Contact details for whoever is actually on the road right now. Only an
+        // accepted assignment counts: an OFFERED row is a rider who has not taken
+        // the job, and handing out their number would be wrong.
+        deliveries.stream()
+                .filter(da -> DeliveryAssignmentStatus.activeAssignmentStatuses().contains(da.getStatus()))
+                .findFirst()
+                .ifPresent(da -> {
+                    AppUser rider = da.getDeliveryAgent();
+                    response.setDeliveryContact(BookingDetailsResponse.DeliveryContactView.builder()
+                            .name(DeliveryService.firstNameOf(rider))
+                            .phone(rider.getPhone_number())
+                            .phase(da.getPhase().name())
+                            .build());
+                });
     }
 
     private List<BookingDetailsResponse.ActiveCodeView> loadActiveCodesForCaller(

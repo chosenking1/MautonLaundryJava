@@ -51,6 +51,18 @@ public class DeliveryAssignment {
     @Column(precision = 11, scale = 8)
     private BigDecimal currentLongitude;
 
+    /**
+     * Set when an arrival was reported from outside the expected radius, with
+     * how far off it was. The report is still accepted -- GPS fails in dense
+     * areas and a rider blocked by a false negative is worse than a soft flag --
+     * but it is recorded so the pattern is visible rather than invisible.
+     */
+    @Column(name = "arrival_flagged")
+    private Boolean arrivalFlagged;
+
+    @Column(name = "arrival_distance_m")
+    private Integer arrivalDistanceM;
+
     @Column(name = "last_location_update")
     private LocalDateTime lastLocationUpdate;
 
