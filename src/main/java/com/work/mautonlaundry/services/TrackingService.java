@@ -42,6 +42,10 @@ public class TrackingService {
     private static final String BOOKING_LAST_PERSIST_KEY = "booking:lastpersist:%s";
     private static final String DELIVERY_AGENTS_GEO_KEY = "delivery_agents_geo";
     private static final String AGENT_ONLINE_KEY = "agent:online:%s";
+
+    /** How long an agent stays dispatchable after a heartbeat. */
+    @org.springframework.beans.factory.annotation.Value("${app.dispatch.agent-presence-ttl-seconds:210}")
+    private long agentPresenceTtlSeconds;
     private static final long ROUTE_PERSIST_INTERVAL_SECONDS = 60;
 
     private static final List<DeliveryAssignmentStatus> ACTIVE_TRACKING_STATUSES =
@@ -253,8 +257,20 @@ public class TrackingService {
         );
     }
 
+    /**
+     * Marks an agent available for dispatch, for a window longer than the app's
+     * heartbeat interval.
+     *
+     * <p>The window used to be 90 seconds against a 60-second heartbeat, so a
+     * single deferred timer dropped the agent out of dispatch entirely -- and
+     * Android routinely defers background timers by more than 30 seconds once
+     * the screen is off. A rider standing in the right place would silently stop
+     * receiving offers with nothing on screen to say so. Three missed beats is a
+     * real outage; one is a doze cycle.
+     */
     private void updateAgentPresence(String agentId) {
-        redisTemplate.opsForValue().set(AGENT_ONLINE_KEY.formatted(agentId), "1", Duration.ofSeconds(90));
+        redisTemplate.opsForValue().set(
+                AGENT_ONLINE_KEY.formatted(agentId), "1", Duration.ofSeconds(agentPresenceTtlSeconds));
     }
 
     private void broadcastLiveLocation(String bookingId, LiveLocationSnapshot snapshot) {
