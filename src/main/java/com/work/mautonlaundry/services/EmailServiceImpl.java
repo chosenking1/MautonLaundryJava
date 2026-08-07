@@ -59,11 +59,11 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     @Async
-    public void sendBookingNotification(String email, String bookingId, String message) {
+    public void sendBookingNotification(String email, String reference, String message) {
         // Every update used the same subject, so a customer's inbox filled with
         // identical lines and they had to open each one to learn anything.
         String subject = deriveSubject(message) + " - " + fromName;
-        String body = buildBookingNotificationBody(bookingId, message);
+        String body = buildBookingNotificationBody(reference, message);
         sendEmail(email, subject, body);
     }
 
@@ -288,16 +288,24 @@ public class EmailServiceImpl implements EmailService {
         return firstSentence.length() > 60 ? "Order update" : firstSentence;
     }
 
-    private String buildBookingNotificationBody(String bookingId, String message) {
-        String reference = bookingId == null || bookingId.length() < 8
-                ? bookingId
-                : bookingId.substring(0, 8).toUpperCase();
+    /**
+     * @param reference the order's tracking number, or null when it could not
+     *                  be resolved. Previously this took the booking id and
+     *                  printed the first eight characters of the UUID as an
+     *                  "Order reference" -- a code that exists nowhere else in
+     *                  the product, so a customer quoting it to support was
+     *                  quoting something unlookuppable. Omitted entirely rather
+     *                  than shown as an internal id.
+     */
+    private String buildBookingNotificationBody(String reference, String message) {
+        String referenceBlock = reference == null || reference.isBlank() ? ""
+                : "<p style=\"margin:0 0 4px 0;font-size:13px;color:#6B7280;\">Order reference</p>"
+                        + "<p style=\"margin:0 0 20px 0;font-size:15px;font-weight:600;color:#1A3A6B;\">"
+                        + reference + "</p>";
         return emailShell(
                 null,
                 para(message)
-                        + "<p style=\"margin:0 0 4px 0;font-size:13px;color:#6B7280;\">Order reference</p>"
-                        + "<p style=\"margin:0 0 20px 0;font-size:15px;font-weight:600;color:#1A3A6B;\">"
-                        + reference + "</p>"
+                        + referenceBlock
                         + note("You can follow your order in the Imototo app at any time. If something "
                                 + "does not look right, use Help &amp; Support in the app."));
     }

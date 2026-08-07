@@ -1,5 +1,7 @@
 package com.work.mautonlaundry.services;
 
+import com.work.mautonlaundry.data.model.Booking;
+import com.work.mautonlaundry.data.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +16,8 @@ public class NotificationService {
 
     @Autowired
     private EmailService emailService;
+    @Autowired
+    private BookingRepository bookingRepository;
     private final ExecutorService notificationExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     @PreDestroy
@@ -35,11 +39,10 @@ public class NotificationService {
     }
 
     public void notifyUserLaundrymanAssigned(String userEmail, String bookingId, String laundrymanName) {
-        String message = String.format(
-                "Great news! A laundry agent has been assigned to your booking #%s. They will soon pick up your items.",
-                bookingId
-        );
-        dispatchNotification(userEmail, bookingId, message);
+        // Was "your booking #<uuid>" -- the customer has never seen that value
+        // anywhere and cannot match it to the order in their app.
+        dispatchNotification(userEmail, bookingId,
+                "A laundry partner has accepted your order. We'll arrange collection next.");
     }
 
     /**
@@ -60,52 +63,33 @@ public class NotificationService {
                 "We've replied to your message about \"" + subject + "\". Open Help & Support to read it.");
     }
 
-    public void notifyBookingCompleted(String userEmail, String bookingId) {
-        dispatchNotification(userEmail, bookingId, "Booking completed");
-    }
 
     public void notifyDeliveryOffer(String deliveryAgentEmail, String bookingId, String phase, double distanceKm) {
-        String message = String.format(
-                "New %s assignment offer for booking %s. You are %.2f km away. Accept in app.",
-                phase, bookingId, distanceKm
-        );
-        dispatchNotification(deliveryAgentEmail, bookingId, message);
+        dispatchNotification(deliveryAgentEmail, bookingId,
+                AgentNotificationText.deliveryOffer(phase, referenceFor(bookingId), distanceKm));
     }
 
-    public void notifyLaundrymanAssigned(String laundrymanEmail, String bookingId, long activeLoad) {
-        String message = String.format(
-                "New washing assignment for booking %s. Current active workload: %d",
-                bookingId, activeLoad
-        );
-        dispatchNotification(laundrymanEmail, bookingId, message);
-    }
 
     public void notifyLaundryOffer(String laundrymanEmail, String bookingId) {
-        String message = String.format(
-                "New laundry offer for booking %s. Please accept or reject in app.",
-                bookingId
-        );
-        dispatchNotification(laundrymanEmail, bookingId, message);
+        dispatchNotification(laundrymanEmail, bookingId,
+                AgentNotificationText.laundryOffer(referenceFor(bookingId)));
     }
 
     public void notifyDriverAssigned(String userEmail, String bookingId) {
-        dispatchNotification(userEmail, bookingId, "A driver has been assigned to your booking");
+        dispatchNotification(userEmail, bookingId, CustomerStatusText.forStatus("PICKUP_AGENT_ASSIGNED"));
     }
 
-    public void notifyDriverArriving(String userEmail, String bookingId) {
-        dispatchNotification(userEmail, bookingId, "Your driver is arriving soon");
-    }
 
     public void notifyLaundryReady(String userEmail, String bookingId) {
-        dispatchNotification(userEmail, bookingId, "Your laundry is ready for delivery");
+        dispatchNotification(userEmail, bookingId, CustomerStatusText.forStatus("READY_FOR_DELIVERY"));
     }
 
     public void notifyOutForDelivery(String userEmail, String bookingId) {
-        dispatchNotification(userEmail, bookingId, "Your laundry is out for delivery");
+        dispatchNotification(userEmail, bookingId, CustomerStatusText.forStatus("OUT_FOR_DELIVERY"));
     }
 
     public void notifyDelivered(String userEmail, String bookingId) {
-        dispatchNotification(userEmail, bookingId, "Your laundry has been delivered");
+        dispatchNotification(userEmail, bookingId, CustomerStatusText.forStatus("DELIVERED"));
     }
 
     public void notifyDeliveryProgress(String userEmail, String bookingId, String message) {
@@ -117,9 +101,11 @@ public class NotificationService {
     }
 
     public void notifyEarlyDeliveryOption(String userEmail, String bookingId, String scheduledDate, String nextDayDate) {
+        // The order number is printed in the email body already; naming it in
+        // the sentence too just crowds out the question being asked.
         String message = String.format(
-                "Booking %s is ready early. Would you prefer delivery on your scheduled date (%s) or on the next day (%s)?",
-                bookingId,
+                "Your laundry is ready ahead of schedule. Would you prefer it delivered on your "
+                        + "original date (%s), or a day earlier (%s)?",
                 scheduledDate,
                 nextDayDate
         );
@@ -176,16 +162,44 @@ public class NotificationService {
         });
     }
 
+    /**
+     * The order's tracking number -- the reference the customer and the apps
+     * actually show.
+     *
+     * <p>Emails used to derive a reference by truncating the booking's UUID,
+     * which produced a code that appears nowhere else in the product: support
+     * could not look it up and the customer could not match it to anything on
+     * screen. Null when it cannot be resolved, and callers omit the reference
+     * entirely rather than falling back to an internal id.
+     */
+    private String referenceFor(String bookingId) {
+        if (bookingId == null || bookingId.isBlank()) {
+            return null;
+        }
+        try {
+            return bookingRepository.findById(bookingId)
+                    .map(Booking::getTrackingNumber)
+                    .filter(t -> t != null && !t.isBlank())
+                    .orElse(null);
+        } catch (Exception e) {
+            // A notification is worth sending without its reference; it is not
+            // worth failing over one.
+            log.warn("Could not resolve tracking number for booking {}: {}", bookingId, e.getMessage());
+            return null;
+        }
+    }
+
     private void dispatchNotification(String email, String bookingId, String message) {
         if (email == null || email.isBlank()) {
             log.warn("Cannot dispatch notification: email is null or blank for booking {}", bookingId);
             return;
         }
-        
+
+        String reference = referenceFor(bookingId);
         notificationExecutor.submit(() -> {
             try {
                 log.info("Sending notification email to: {} for booking: {}", email, bookingId);
-                emailService.sendBookingNotification(email, bookingId, message);
+                emailService.sendBookingNotification(email, reference, message);
                 log.info("Notification sent successfully to: {}", email);
             } catch (Exception ex) {
                 log.error("Failed to dispatch notification for booking {}. Error: {}", bookingId, ex.getMessage(), ex);
@@ -193,29 +207,4 @@ public class NotificationService {
         });
     }
 
-    /**
-     * Superseded by {@link CustomerStatusText}. Kept only for any caller still
-     * wanting a short label rather than a sentence.
-     */
-    @SuppressWarnings("unused")
-    private String formatStatusDescription(String status) {
-        return switch (status) {
-            case "CREATED" -> "Order Placed";
-            case "LAUNDRY_ASSIGNMENT_PENDING" -> "Finding Laundry";
-            case "LAUNDRY_ACCEPTED" -> "Laundry Accepted";
-            case "PICKUP_DISPATCH_PENDING" -> "Dispatching Pickup";
-            case "PICKUP_AGENT_ASSIGNED" -> "Pickup Agent Assigned";
-            case "PICKED_UP" -> "Picked Up";
-            case "AT_LAUNDRY" -> "At Laundry";
-            case "WASHING" -> "Washing";
-            case "READY_FOR_DELIVERY" -> "Ready for Delivery";
-            case "DELIVERY_DISPATCH_PENDING" -> "Dispatching Delivery";
-            case "DELIVERY_AGENT_ASSIGNED" -> "Delivery Agent Assigned";
-            case "OUT_FOR_DELIVERY" -> "Out for Delivery";
-            case "DELIVERED" -> "Delivered";
-            case "COMPLETED" -> "Completed";
-            case "CANCELLED" -> "Cancelled";
-            default -> status.replace("_", " ");
-        };
-    }
 }

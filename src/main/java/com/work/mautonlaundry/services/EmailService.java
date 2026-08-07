@@ -15,11 +15,14 @@ public interface EmailService {
 
     void sendPasswordResetEmail(String email, String token);
     /**
-     * @param message a sentence already written for the customer, not a status
-     *                name. Pass raw enum values here and the customer reads them
-     *                -- see {@link CustomerStatusText}, which exists to convert.
+     * @param reference the order's tracking number as the customer sees it in
+     *                  the app, or null to omit it. Never an internal id.
+     * @param message   a sentence already written for the reader, not a status
+     *                  name. Pass raw enum values here and they read them --
+     *                  see {@link CustomerStatusText} and
+     *                  {@link AgentNotificationText}, which exist to convert.
      */
-    void sendBookingNotification(String email, String bookingId, String message);
+    void sendBookingNotification(String email, String reference, String message);
     void sendAgentApplicationSubmitted(String email, String roleName, int locationsCount, String adminTeamEmail);
     void sendAdminAgentApplicationNotification(String adminEmail, String applicantEmail, String roleName, int locationsCount);
     void sendAgentApplicationApproved(String email, String roleName);

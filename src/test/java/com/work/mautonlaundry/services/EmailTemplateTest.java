@@ -39,8 +39,7 @@ class EmailTemplateTest {
     }
 
     private String notification() {
-        return build("buildBookingNotificationBody",
-                "0af6dfbd-e30c-4349-887b-14f54c4912de",
+        return build("buildBookingNotificationBody", "TRK1754429181234",
                 "Your laundry has arrived at our facility.");
     }
 
@@ -82,10 +81,22 @@ class EmailTemplateTest {
     }
 
     @Test
-    void theNotificationShowsAShortReferenceNotTheRawUuid() {
+    void theNotificationShowsTheRealTrackingNumber() {
+        // It used to print the first eight characters of the booking's UUID as
+        // an "Order reference" -- a code that appears nowhere else in the
+        // product, so a customer quoting it to support quoted nothing.
         String body = notification();
-        assertThat(body).contains("0AF6DFBD");
-        assertThat(body).doesNotContain("0af6dfbd-e30c-4349-887b-14f54c4912de");
+        assertThat(body).contains("TRK1754429181234");
+        assertThat(body).contains("Order reference");
+    }
+
+    @Test
+    void anUnresolvableReferenceIsOmittedRatherThanFaked() {
+        for (String missing : new String[] {null, "", "  "}) {
+            String body = build("buildBookingNotificationBody", missing, "Your laundry is on its way.");
+            assertThat(body).doesNotContain("Order reference");
+            assertThat(body).contains("Your laundry is on its way.");
+        }
     }
 
     @Test

@@ -72,8 +72,14 @@ public class PickupSchedulingService {
         return LocalDateTime.now(zone());
     }
 
+    /**
+     * Derived from {@link #now()} rather than read from the clock again, so
+     * "today" cannot mean one date here and another in {@link #availability()}
+     * -- which is what happens either side of midnight when two calls land on
+     * opposite sides of it.
+     */
     public LocalDate today() {
-        return LocalDate.now(zone());
+        return now().toLocalDate();
     }
 
     private ZoneId zone() {
