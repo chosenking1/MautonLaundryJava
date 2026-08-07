@@ -152,4 +152,96 @@ class EmailTemplateTest {
         assertThat(body).doesNotContain("<ol");
         assertThat(body).doesNotContain("<ul");
     }
+
+    // ---- the agent / admin templates --------------------------------------
+
+    private String[] everyTemplate() {
+        return new String[] {
+            verification(), reset(), notification(), welcome("Ada"),
+            build("buildAgentApplicationSubmittedBody", "LAUNDRY_AGENT", 2, "ops@imototo.com"),
+            build("buildAdminAgentApplicationNotificationBody", "ada@example.com", "DELIVERY_AGENT", 1),
+            build("buildAgentApplicationApprovedBody", "DELIVERY_AGENT"),
+            build("buildAgentApplicationRejectedBody", "LAUNDRY_AGENT", "Premises failed inspection.", "ops@imototo.com"),
+            build("buildAgentDeactivationBody", "DELIVERY_AGENT", "Repeated no-shows.", "ops@imototo.com"),
+            build("buildDiscountApprovedBody", "WELCOME10"),
+        };
+    }
+
+    @Test
+    void everyTemplateIsOnTheSharedShell() {
+        for (String body : everyTemplate()) {
+            assertThat(body).contains("#1A3A6B");
+            assertThat(body).contains("Outsource the dirty work.");
+            assertThat(body).contains("role=\"presentation\"");
+        }
+    }
+
+    @Test
+    void noTemplateStillUsesTheOldBarePage() {
+        for (String body : everyTemplate()) {
+            assertThat(body).doesNotContain("Arial, sans-serif");
+            assertThat(body).doesNotContain("Best regards,");
+        }
+    }
+
+    @Test
+    void noRoleReachesAnAgentAsAnEnum() {
+        // Templates each did roleName.replace("_"," ").toLowerCase() inline.
+        for (String body : everyTemplate()) {
+            assertThat(body).doesNotContain("LAUNDRY_AGENT");
+            assertThat(body).doesNotContain("DELIVERY_AGENT");
+        }
+        assertThat(build("buildAgentApplicationApprovedBody", "DELIVERY_AGENT"))
+                .contains("delivery rider");
+    }
+
+    @Test
+    void anUnknownRoleDegradesRatherThanShowingTheEnum() {
+        assertThat(build("buildAgentApplicationApprovedBody", "SOME_NEW_ROLE"))
+                .contains("some new role")
+                .doesNotContain("SOME_NEW_ROLE");
+        assertThat(build("buildAgentApplicationApprovedBody", (String) null))
+                .contains("agent")
+                .doesNotContain("null");
+    }
+
+    @Test
+    void theDiscountEmailNamesTheDiscount() {
+        // The name was passed in and never used, so every one of these said
+        // "your discount code" and left the reader to guess which.
+        assertThat(build("buildDiscountApprovedBody", "WELCOME10")).contains("WELCOME10");
+        assertThat(build("buildDiscountApprovedBody", (String) null))
+                .contains("Your discount")
+                .doesNotContain("null");
+    }
+
+    @Test
+    void aMissingReasonLeavesNoEmptyCallout() {
+        for (String blank : new String[] {null, "", "  "}) {
+            String body = build("buildAgentApplicationRejectedBody", "LAUNDRY_AGENT", blank, "ops@imototo.com");
+            assertThat(body).doesNotContain("REASON");
+        }
+        assertThat(build("buildAgentApplicationRejectedBody", "LAUNDRY_AGENT", "Failed inspection.", "ops@imototo.com"))
+                .contains("REASON")
+                .contains("Failed inspection.");
+    }
+
+    @Test
+    void aMissingContactEmailLeavesNoDanglingSentence() {
+        for (String blank : new String[] {null, "", "  "}) {
+            String body = build("buildAgentDeactivationBody", "DELIVERY_AGENT", "Reason.", blank);
+            assertThat(body).doesNotContain("email us at");
+            assertThat(body).doesNotContain("email our team at");
+            assertThat(body).doesNotContain("mailto:");
+        }
+    }
+
+    @Test
+    void oneLocationDoesNotReadAsOneLocations() {
+        assertThat(build("buildAgentApplicationSubmittedBody", "LAUNDRY_AGENT", 1, "ops@imototo.com"))
+                .contains("one location")
+                .doesNotContain("1 locations");
+        assertThat(build("buildAgentApplicationSubmittedBody", "LAUNDRY_AGENT", 3, "ops@imototo.com"))
+                .contains("3 locations");
+    }
 }

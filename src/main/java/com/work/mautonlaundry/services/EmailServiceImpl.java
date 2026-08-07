@@ -310,94 +310,125 @@ public class EmailServiceImpl implements EmailService {
                                 + "does not look right, use Help &amp; Support in the app."));
     }
 
+    /**
+     * A role name a person would say out loud.
+     *
+     * <p>The templates each did {@code roleName.replace("_"," ").toLowerCase()}
+     * inline, which is fine for LAUNDRY_AGENT and turns anything else we add
+     * into whatever the enum happens to be called.
+     */
+    private String roleLabel(String roleName) {
+        if (roleName == null || roleName.isBlank()) {
+            return "agent";
+        }
+        return switch (roleName.trim().toUpperCase()) {
+            case "LAUNDRY_AGENT" -> "laundry partner";
+            case "DELIVERY_AGENT" -> "delivery rider";
+            case "ADMIN" -> "administrator";
+            default -> roleName.replace("_", " ").toLowerCase();
+        };
+    }
+
+    /** A labelled fact, for the admin-facing summary emails. */
+    private String detail(String label, String value) {
+        return "<p style=\"margin:0 0 6px 0;font-size:14px;color:#1A1A2E;\">"
+                + "<span style=\"color:#6B7280;\">" + label + ":</span> <strong>"
+                + value + "</strong></p>";
+    }
+
+    /** A reason or note that needs to stand out from the sentence around it. */
+    private String calloutNote(String label, String text) {
+        return "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
+                + "style=\"margin:0 0 18px 0;\"><tr>"
+                + "<td style=\"background:#F5F7FA;border-left:3px solid #1A3A6B;padding:12px 14px;\">"
+                + "<p style=\"margin:0 0 2px 0;font-size:12px;font-weight:700;letter-spacing:0.4px;"
+                + "color:#6B7280;\">" + label.toUpperCase() + "</p>"
+                + "<p style=\"margin:0;font-size:14px;line-height:1.5;color:#1A1A2E;\">"
+                + text + "</p></td></tr></table>";
+    }
+
+    private String contactLine(String adminTeamEmail, String lead) {
+        if (adminTeamEmail == null || adminTeamEmail.isBlank()) {
+            return "";
+        }
+        return note(lead + " <a href=\"mailto:" + adminTeamEmail
+                + "\" style=\"color:#1A3A6B;\">" + adminTeamEmail + "</a>.");
+    }
+
     private String buildAgentApplicationSubmittedBody(String roleName, int locationsCount, String adminTeamEmail) {
         boolean isLaundry = "LAUNDRY_AGENT".equalsIgnoreCase(roleName);
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>Application Received</h2>" +
-                "<p>Thank you for applying to become a " + roleName.replace("_", " ").toLowerCase() + ".</p>" +
-                "<p>We have recorded " + locationsCount + " location(s).</p>" +
-                (isLaundry
-                        ? "<p>Our team will conduct verification visits to the locations provided. Visits can happen on any day without prior notice.</p>" +
-                          "<p>If any location fails inspection, the application will be declined.</p>"
-                        : "<p>Our team will review your details and get back to you.</p>") +
-                (adminTeamEmail == null || adminTeamEmail.isBlank()
-                        ? ""
-                        : "<p>If you need to update your information, contact us at " + adminTeamEmail + ".</p>") +
-                "<p>Best regards,<br>The " + fromName + " Team</p>" +
-                "</body>" +
-                "</html>";
+        String locations = locationsCount == 1 ? "one location" : locationsCount + " locations";
+        return emailShell(
+                "Application received",
+                para("Thanks for applying to join Imototo as a " + roleLabel(roleName)
+                        + ". We have your details and " + locations + ".")
+                        + (isLaundry
+                                ? para("Next, someone from our team will visit each location to "
+                                        + "inspect it. Visits are unannounced and can happen on any "
+                                        + "day, so please keep the premises ready.")
+                                        + note("If a location does not pass inspection, the "
+                                                + "application cannot go ahead.")
+                                : para("Next, our team will review your details and come back to "
+                                        + "you."))
+                        + contactLine(adminTeamEmail, "Need to change something? Email us at"));
     }
 
     private String buildAdminAgentApplicationNotificationBody(String applicantEmail, String roleName, int locationsCount) {
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>New Agent Application</h2>" +
-                "<p>A new application has been submitted.</p>" +
-                "<p><strong>Applicant:</strong> " + applicantEmail + "</p>" +
-                "<p><strong>Role:</strong> " + roleName.replace("_", " ").toLowerCase() + "</p>" +
-                "<p><strong>Locations:</strong> " + locationsCount + "</p>" +
-                "<p>Please log in to the admin dashboard to review.</p>" +
-                "</body>" +
-                "</html>";
+        return emailShell(
+                "New agent application",
+                para("An application is waiting for review.")
+                        + detail("Applicant", applicantEmail)
+                        + detail("Applying as", roleLabel(roleName))
+                        + detail("Locations", String.valueOf(locationsCount))
+                        + note("Open the admin dashboard to approve or decline it."));
     }
 
     private String buildAgentApplicationApprovedBody(String roleName) {
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>Application Approved</h2>" +
-                "<p>Your application to become a " + roleName.replace("_", " ").toLowerCase() + " has been approved.</p>" +
-                "<p>You can now log in to the Imototo Ops application to access agent functionality.</p>" +
-                "<p>Best regards,<br>The " + fromName + " Team</p>" +
-                "</body>" +
-                "</html>";
+        return emailShell(
+                "You're approved",
+                para("Your application to join Imototo as a " + roleLabel(roleName)
+                        + " has been approved.")
+                        + para("Sign in to the Imototo Ops app with the same email address and "
+                                + "you can start taking work.")
+                        + note("Go online in the app when you are ready to receive jobs. You will "
+                                + "not be offered anything while you are offline."));
     }
 
     private String buildAgentApplicationRejectedBody(String roleName, String reason, String adminTeamEmail) {
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>Application Update</h2>" +
-                "<p>Your application to become a " + roleName.replace("_", " ").toLowerCase() + " was not approved.</p>" +
-                "<p><strong>Reason:</strong> " + reason + "</p>" +
-                (adminTeamEmail == null || adminTeamEmail.isBlank()
-                        ? ""
-                        : "<p>If you believe this is a mistake, contact us at " + adminTeamEmail + ".</p>") +
-                "<p>Best regards,<br>The " + fromName + " Team</p>" +
-                "</body>" +
-                "</html>";
+        return emailShell(
+                "About your application",
+                para("Your application to join Imototo as a " + roleLabel(roleName)
+                        + " was not approved this time.")
+                        + (reason == null || reason.isBlank() ? "" : calloutNote("Reason", reason))
+                        + contactLine(adminTeamEmail, "If you think this is a mistake, email us at"));
     }
 
     private String buildAgentDeactivationBody(String roleName, String reason, String adminTeamEmail) {
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>Account Update</h2>" +
-                "<p>Your " + roleName.replace("_", " ").toLowerCase() + " access has been deactivated.</p>" +
-                (reason == null || reason.isBlank() ? "" : "<p><strong>Reason:</strong> " + reason + "</p>") +
-                (adminTeamEmail == null || adminTeamEmail.isBlank()
-                        ? ""
-                        : "<p>If you believe this is a mistake, please reach out to our admin team at " + adminTeamEmail + ".</p>") +
-                "<p>Best regards,<br>The " + fromName + " Team</p>" +
-                "</body>" +
-                "</html>";
+        return emailShell(
+                "Your access has been paused",
+                para("Your " + roleLabel(roleName) + " access on Imototo has been deactivated, so "
+                        + "you will not be offered new jobs.")
+                        + (reason == null || reason.isBlank() ? "" : calloutNote("Reason", reason))
+                        + contactLine(adminTeamEmail, "To discuss this, email our team at"));
     }
 
     @Override
     @Async
     public void sendDiscountApprovedEmail(String email, String discountName) {
-        String subject = "Discount Approved - " + fromName;
-        String body = buildDiscountApprovedBody(discountName);
-        sendEmail(email, subject, body);
+        String subject = "Your discount is active - " + fromName;
+        sendEmail(email, subject, buildDiscountApprovedBody(discountName));
     }
 
     private String buildDiscountApprovedBody(String discountName) {
-        return "<html>" +
-                "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
-                "<h2>Discount Approved!</h2>" +
-                "<p>Great news! Your discount code has been verified and is now active.</p>" +
-                "<p>You can now use your discount on your next order.</p>" +
-                "<p>Thank you for choosing " + fromName + "!</p>" +
-                "<p>Best regards,<br>The " + fromName + " Team</p>" +
-                "</body>" +
-                "</html>";
+        // The name was passed in and never used, so every one of these said
+        // "your discount code" and left the reader to guess which.
+        String named = discountName == null || discountName.isBlank()
+                ? "Your discount"
+                : "Your discount, " + discountName + ",";
+        return emailShell(
+                "Your discount is active",
+                para(named + " has been approved and is ready to use.")
+                        + para("It will be applied when you enter the code on your next order.")
+                        + note("Discounts apply to the order total before delivery."));
     }
 }
