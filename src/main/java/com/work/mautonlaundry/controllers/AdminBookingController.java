@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -45,7 +46,11 @@ public class AdminBookingController {
         if (size < 1) {
             size = 10;
         }
-        Pageable pageable = PageRequest.of(page, size);
+        // Newest first, with id as a tiebreaker. Without an explicit order Postgres
+        // returns LIMIT/OFFSET pages in no stable order, so bookings were skipped
+        // or repeated across pages and new ones rarely landed on page one.
+        Pageable pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         if (status == null || status.isBlank()) {
             return ResponseEntity.ok(bookingService.getAllBookings(pageable));
         }

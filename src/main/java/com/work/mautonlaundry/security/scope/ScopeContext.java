@@ -65,7 +65,17 @@ public record ScopeContext(
         return new ScopeContext(null, Set.of(), Set.of(), null, true);
     }
 
-    /** True when the scope imposes no restriction at all. */
+    /**
+     * True when the scope imposes no restriction at all.
+     *
+     * <p>Not serialised. Jackson would write this derived value out as an
+     * "unrestricted" property, but the record's canonical constructor takes only
+     * the five real components -- so reading the entry back failed with
+     * "Unrecognized field", every cache hit fell through to the database, and
+     * the log filled with warnings. The value is computed from `denied` and
+     * `level`, both of which are cached, so nothing is lost by omitting it.
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public boolean isUnrestricted() {
         return !denied && level == ScopeLevel.NATIONAL;
     }

@@ -78,6 +78,12 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private AuditService auditService;
 
     @Autowired
+    private ScopeProvisioningService scopeProvisioningService;
+
+    @Autowired
+    private TermsService termsService;
+
+    @Autowired
     @Lazy
     private ReferralService referralService;
 
@@ -124,9 +130,22 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         // Save user first
         AppUser savedUser = userRepository.save(user);
         
-        // Create address only if street or city is provided
-        if ((request.getStreet() != null && !request.getStreet().trim().isEmpty()) || 
-            (request.getCity() != null && !request.getCity().trim().isEmpty())) {
+        // Create address only if street or city is provided -- and only with
+        // coordinates. The other route in, POST /api/v1/addresses, now requires
+        // them; without the same rule here, registration would remain a way to
+        // create an address that dispatch can never use, and the customer would
+        // not find out until their first booking refused to select it. Signup
+        // itself is never blocked: the address is simply skipped, and the app
+        // collects it properly (with the map) at booking time.
+        boolean hasAddressFields =
+                (request.getStreet() != null && !request.getStreet().trim().isEmpty())
+                        || (request.getCity() != null && !request.getCity().trim().isEmpty());
+        boolean hasCoordinates = request.getLatitude() != null && request.getLongitude() != null;
+        if (hasAddressFields && !hasCoordinates) {
+            log.warn("Skipping address at registration for {}: no coordinates supplied, "
+                    + "an address without a pin cannot be dispatched", savedUser.getEmail());
+        }
+        if (hasAddressFields && hasCoordinates) {
             Address address = new Address();
             address.setUser(savedUser);
             address.setStreet(request.getStreet());
@@ -149,6 +168,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         } catch (Exception ex) {
             log.warn("Referral attribution skipped for {}: {}", savedUser.getEmail(), ex.getMessage());
         }
+
+        // Record consent as part of creating the account, in the same
+        // transaction: an account that exists with no record of what its owner
+        // agreed to is the gap this closes.
+        termsService.record(savedUser, request.getAcceptedTermsVersion(), "REGISTRATION", null);
 
         auditService.logAction("CREATE", "USER", savedUser.getEmail());
         registerResponse.setEmail(savedUser.getEmail());
@@ -281,7 +305,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         
         user.setRole(role);
 
-        userRepository.save(user);
+        AppUser savedRoleChange = userRepository.save(user);
+        // A role grants permissions but no data scope; without this an admin
+        // promoted here holds every permission and can see nothing.
+        scopeProvisioningService.ensureScopeForRole(savedRoleChange);
     }
 
     @Override
@@ -328,15 +355,29 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         }
         
         AppUser user = verificationToken.getUser();
+        // Whether this is the first time this address has been confirmed decides
+        // whether a welcome email goes out. Read it before the flag is set: a user
+        // who verifies, then clicks a second still-valid link, should not be
+        // welcomed twice.
+        boolean firstVerification = !Boolean.TRUE.equals(user.getEmailVerified());
         user.setEmailVerified(true);
         userRepository.save(user);
-        
+
         // Manual cache eviction
         cacheManager.getCache("users").evict(user.getEmail().toLowerCase());
-        
+
         verificationToken.setUsed(true);
         tokenRepository.save(verificationToken);
-        
+
+        if (firstVerification) {
+            // After commit, like the other outbound mail: an email cannot be
+            // rolled back, so welcoming someone whose verification then failed to
+            // persist would leave them holding a mail for an unverified account.
+            String email = user.getEmail();
+            String firstName = DeliveryService.firstNameOf(user);
+            sendAfterCommit(() -> emailService.sendWelcomeEmail(email, firstName));
+        }
+
         return true;
     }
 

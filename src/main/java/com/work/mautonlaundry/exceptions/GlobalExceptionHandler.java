@@ -128,6 +128,19 @@ public class GlobalExceptionHandler {
         if (message.isBlank()) {
             message = "Some of the details you entered are invalid. Please check and try again.";
         }
+        // Log the rejection. @Valid fails before the controller method runs, so
+        // its own "attempt" log line never executes and a rejected request left
+        // no trace at all -- which reads in the logs exactly like a client that
+        // never called, and sent us hunting for a network fault that did not
+        // exist. Field names go to the log, never to the caller.
+        String fields = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + "=" + fe.getRejectedValue())
+                .collect(java.util.stream.Collectors.joining(", "));
+        log.warn("Rejected {} {}: {} [{}]",
+                ex.getParameter().getMethod() == null
+                        ? "request" : ex.getParameter().getMethod().getName(),
+                "validation", message, fields);
+
         ErrorResponse error = new ErrorResponse("VALIDATION_ERROR", message, LocalDateTime.now());
         return ResponseEntity.badRequest().body(error);
     }

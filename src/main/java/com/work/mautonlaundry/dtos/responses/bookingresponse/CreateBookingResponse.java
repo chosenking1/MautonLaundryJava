@@ -3,6 +3,7 @@ package com.work.mautonlaundry.dtos.responses.bookingresponse;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -16,4 +17,13 @@ public class CreateBookingResponse {
     private String discountCode;
     private LocalDateTime returnDate;
     private String status;
+
+    /**
+     * The window the customer chose, or null if they asked to be collected now.
+     * pickupWindow is the sentence to show; the parts are there for clients that
+     * want to format it themselves.
+     */
+    private LocalDate scheduledPickupDate;
+    private String pickupSlotId;
+    private String pickupWindow;
 }

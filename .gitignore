@@ -38,6 +38,10 @@ build/
 # that matter most. Tests are tracked.
 *.docx
 *.md
+# ...but the terms text is served to users and must be versioned with the code:
+# it is the record of what each customer agreed to. Third time a blanket ignore
+# has silently excluded something load-bearing, after *.sql and /src/test.
+!src/main/resources/terms/*.md
 *.db
 # Keeps local dumps and scratch queries out of the repo...
 *.sql

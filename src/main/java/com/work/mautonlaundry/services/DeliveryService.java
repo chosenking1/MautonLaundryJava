@@ -61,6 +61,13 @@ public class DeliveryService {
     private final MetricsService metricsService;
     private final BookingService bookingService;
     private final HandoffCodeService handoffCodeService;
+    private final GeoLocationService geoLocationService;
+    private final AuditService auditService;
+
+    /** Metres a rider may be from a stop and still be considered arrived. */
+    @org.springframework.beans.factory.annotation.Value("${app.delivery.arrival-radius-m:200}")
+    private int arrivalRadiusMetres;
+
 
     @Transactional
     public AcceptDeliveryJobResponse acceptDeliveryJob(AcceptDeliveryJobRequest request) {
@@ -166,6 +173,7 @@ public class DeliveryService {
                 .orElseThrow(() -> new ForbiddenOperationException("No delivery assignment found for this booking"));
 
         validateRouteProgress(phase, assignment.getStatus(), normalizedStatus);
+        verifyArrivalProximity(booking, assignment, phase, normalizedStatus, request);
 
         DeliveryAssignmentStatus nextAssignmentStatus = mapAssignmentStatus(phase, normalizedStatus);
         boolean assignmentChanged = assignment.getStatus() != nextAssignmentStatus;
@@ -564,12 +572,93 @@ public class DeliveryService {
             return null;
         }
 
+        // The contact is whoever owns the address being travelled to, so the
+        // rider can call ahead when a dropped pin does not match reality.
+        AppUser contact = next.getUser();
+
         return DeliveryNextStop.builder()
                 .label(label)
+                .contactName(firstNameOf(contact))
+                .contactPhone(contact == null ? null : contact.getPhone_number())
                 .lat(next.getLatitude())
                 .lng(next.getLongitude())
                 .addressLine(formatAddressLine(next))
                 .build();
+    }
+
+    /**
+     * Checks an "arrived" report against where the rider actually was.
+     *
+     * <p>Flag and allow, never block. GPS fails in dense areas, and a rider who
+     * genuinely is at the gate but carrying a bad fix would otherwise be unable
+     * to work at all -- a worse outcome than an unverified arrival, especially
+     * since the physical handoff still needs a code from the person there. So an
+     * out-of-range report is accepted and recorded, which makes the pattern
+     * reviewable instead of invisible.
+     *
+     * <p>A missing fix is treated as unverified rather than suspicious: older app
+     * builds send no coordinates at all.
+     */
+    private void verifyArrivalProximity(Booking booking,
+                                        DeliveryAssignment assignment,
+                                        DeliveryAssignmentPhase phase,
+                                        DeliveryRouteStatus status,
+                                        UpdateDeliveryStatusRequest request) {
+        if (status != DeliveryRouteStatus.ARRIVED_AT_PICKUP
+                && status != DeliveryRouteStatus.ARRIVED_AT_LAUNDRY
+                && status != DeliveryRouteStatus.ARRIVED_AT_CUSTOMER) {
+            return;
+        }
+        if (request.getLatitude() == null || request.getLongitude() == null) {
+            log.info("Arrival for booking {} reported without a location fix", booking.getId());
+            return;
+        }
+
+        // The stop being arrived at is the one currently being travelled to.
+        DeliveryNextStop target = resolveNextStop(booking, phase, previousRouteStatus(phase, status));
+        if (target == null || target.getLat() == null || target.getLng() == null) {
+            return;
+        }
+
+        double km = geoLocationService.calculateDistance(
+                request.getLatitude(), request.getLongitude(), target.getLat(), target.getLng());
+        int metres = (int) Math.round(km * 1000);
+        boolean tooFar = metres > arrivalRadiusMetres;
+
+        assignment.setArrivalFlagged(tooFar);
+        assignment.setArrivalDistanceM(metres);
+        deliveryAssignmentRepository.save(assignment);
+
+        if (tooFar) {
+            log.warn("Arrival flagged for booking {}: rider reported arriving at {} but was {}m away "
+                            + "(allowed {}m)", booking.getId(), target.getLabel(), metres, arrivalRadiusMetres);
+            auditService.logAction("ARRIVAL_FLAGGED", "DELIVERY",
+                    booking.getId() + " " + metres + "m from " + target.getLabel());
+        }
+    }
+
+    /** The route status a rider must have been in to now be arriving. */
+    private DeliveryRouteStatus previousRouteStatus(DeliveryAssignmentPhase phase,
+                                                    DeliveryRouteStatus arrival) {
+        List<DeliveryRouteStatus> sequence = routeSequence(phase);
+        int i = sequence.indexOf(arrival);
+        return i > 0 ? sequence.get(i - 1) : arrival;
+    }
+
+    /**
+     * First name only. Enough for a rider to greet the right person at the gate
+     * without handing over the customer's full identity.
+     */
+    static String firstNameOf(AppUser user) {
+        if (user == null || user.getFull_name() == null) {
+            return null;
+        }
+        String trimmed = user.getFull_name().trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        int space = trimmed.indexOf(' ');
+        return space < 0 ? trimmed : trimmed.substring(0, space);
     }
 
     private Address resolveLaundryAddress(Booking booking) {

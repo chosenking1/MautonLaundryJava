@@ -34,6 +34,7 @@ import java.util.NoSuchElementException;
 public class RoleChangeService {
     
     private final RoleChangeRequestRepository requestRepository;
+    private final ScopeProvisioningService scopeProvisioningService;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final AuditService auditService;
@@ -139,6 +140,8 @@ public class RoleChangeService {
         // Apply role change
         AppUser user = request.getUser();
         user.setRole(request.getRequestedRole());
+        // Approving a promotion to ADMIN must also give them something to see.
+        scopeProvisioningService.ensureScopeForRole(user);
         userRepository.save(user);
 
         if (request.getAgentApplication() != null) {
