@@ -39,7 +39,13 @@ public interface UserService {
 
     /** Admin resend: looks the user up by id, then reuses the same token+email flow. */
     void resendVerificationById(String userId);
-    boolean verifyEmail(String token);
+    EmailVerificationOutcome verifyEmail(String token);
+
+    /**
+     * Sends a fresh verification link to the owner of {@code token}, for the
+     * expired-link page: the customer does not have to retype their email.
+     */
+    void resendVerificationForToken(String token);
     
     // Password reset methods
     void sendPasswordResetEmail(String email);
