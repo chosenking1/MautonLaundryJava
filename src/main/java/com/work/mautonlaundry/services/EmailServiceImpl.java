@@ -33,7 +33,9 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async
     public void sendVerificationEmail(String email, String token) {
-        String verificationUrl = baseUrl + "/api/auth/verify-email?token=" + token;
+        // The branded browser page, not the API: the API answered with a bare
+        // line of plain text, which is what customers saw on tapping the link.
+        String verificationUrl = baseUrl + "/verify?token=" + token;
         String subject = "Verify Your Email - " + fromName;
         String body = buildVerificationEmailBody(verificationUrl);
         sendEmail(email, subject, body);

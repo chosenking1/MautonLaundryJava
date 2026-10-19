@@ -346,15 +346,26 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     @Transactional
-    public boolean verifyEmail(String token) {
-        VerificationToken verificationToken = tokenRepository.findByToken(token)
-                .orElse(null);
-        
-        if (verificationToken == null || verificationToken.isExpired() || verificationToken.isUsed()) {
-            return false;
+    public EmailVerificationOutcome verifyEmail(String token) {
+        VerificationToken verificationToken = findVerificationToken(token);
+        if (verificationToken == null) {
+            return EmailVerificationOutcome.INVALID;
         }
-        
+
         AppUser user = verificationToken.getUser();
+        // Checked before used/expired: an old link opened after the account is
+        // confirmed is not an error, and saying "invalid" sent people looking
+        // for a problem that did not exist.
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            return EmailVerificationOutcome.ALREADY_VERIFIED;
+        }
+        if (verificationToken.isUsed()) {
+            return EmailVerificationOutcome.INVALID;
+        }
+        if (verificationToken.isExpired()) {
+            return EmailVerificationOutcome.EXPIRED;
+        }
+
         // Whether this is the first time this address has been confirmed decides
         // whether a welcome email goes out. Read it before the flag is set: a user
         // who verifies, then clicks a second still-valid link, should not be
@@ -378,7 +389,36 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             sendAfterCommit(() -> emailService.sendWelcomeEmail(email, firstName));
         }
 
-        return true;
+        return EmailVerificationOutcome.VERIFIED;
+    }
+
+    @Override
+    @Transactional
+    public void resendVerificationForToken(String token) {
+        VerificationToken verificationToken = findVerificationToken(token);
+        if (verificationToken == null) {
+            throw new IllegalArgumentException(
+                    "This link isn't valid. Enter your email to get a new one.");
+        }
+        AppUser user = verificationToken.getUser();
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new IllegalArgumentException("Your email is already confirmed. You can log in.");
+        }
+        sendEmailVerification(user.getEmail());
+    }
+
+    /**
+     * Only email-verification tokens: findByToken also matches password-reset
+     * tokens, and opening a reset link on the verify page must not confirm the
+     * address. A null type is a legacy row, treated as verification.
+     */
+    private VerificationToken findVerificationToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        return tokenRepository.findByToken(token)
+                .filter(t -> t.getTokenType() != VerificationToken.TokenType.PASSWORD_RESET)
+                .orElse(null);
     }
 
     @Override

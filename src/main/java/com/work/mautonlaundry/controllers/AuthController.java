@@ -7,7 +7,9 @@ import com.work.mautonlaundry.dtos.requests.userrequests.UserLoginRequest;
 import com.work.mautonlaundry.dtos.responses.userresponse.RegisterUserResponse; // Import RegisterUserResponse
 import com.work.mautonlaundry.dtos.responses.userresponse.UserLoginResponse;
 import com.work.mautonlaundry.security.service.AuthService;
+import com.work.mautonlaundry.dtos.responses.common.MessageResponse;
 import com.work.mautonlaundry.services.AuditService;
+import com.work.mautonlaundry.services.EmailVerificationOutcome;
 import com.work.mautonlaundry.services.UserService;
 import com.work.mautonlaundry.util.ValidEmail;
 import jakarta.validation.Valid;
@@ -19,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -87,28 +90,40 @@ public class AuthController {
         return ResponseEntity.ok("Verification email sent");
     }
 
+    /**
+     * Links in verification emails sent before the switch to /verify still
+     * point here. Hand them to the branded page rather than answering a
+     * browser with plain text.
+     */
     @GetMapping("/verify-email")
-    public ResponseEntity<String> verifyEmailGet(@RequestParam String token) {
-        log.info("Email verification attempt with token via GET");
-        boolean verified = userService.verifyEmail(token);
-        if (verified) {
-            log.info("Email verification successful");
-            return ResponseEntity.ok("Email verified successfully. You can now log in.");
-        }
-        log.warn("Email verification failed - invalid or expired token");
-        return ResponseEntity.badRequest().body("Invalid or expired token");
+    public ResponseEntity<Void> verifyEmailGet(@RequestParam String token) {
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(UriComponentsBuilder.fromPath("/verify")
+                        .queryParam("token", token)
+                        .encode()
+                        .build()
+                        .toUri())
+                .build();
     }
 
     @PostMapping("/verify-email")
     public ResponseEntity<String> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
-        log.info("Email verification attempt with token");
-        boolean verified = userService.verifyEmail(request.getToken());
-        if (verified) {
-            log.info("Email verification successful");
-            return ResponseEntity.ok("Email verified successfully");
-        }
-        log.warn("Email verification failed - invalid or expired token");
-        return ResponseEntity.badRequest().body("Invalid or expired token");
+        EmailVerificationOutcome outcome = userService.verifyEmail(request.getToken());
+        log.info("Email verification via API: {}", outcome);
+        return switch (outcome) {
+            case VERIFIED -> ResponseEntity.ok("Email verified successfully");
+            case ALREADY_VERIFIED -> ResponseEntity.ok("Your email is already verified");
+            case EXPIRED -> ResponseEntity.badRequest()
+                    .body("This verification link has expired. Request a new one.");
+            case INVALID -> ResponseEntity.badRequest().body("This verification link isn't valid");
+        };
+    }
+
+    /** The expired-link page's resend: the token identifies the account, so no email is retyped. */
+    @PostMapping("/resend-verification-link")
+    public ResponseEntity<MessageResponse> resendVerificationLink(@Valid @RequestBody VerifyEmailRequest request) {
+        userService.resendVerificationForToken(request.getToken());
+        return ResponseEntity.ok(new MessageResponse("Verification email sent"));
     }
 
     @PostMapping("/forgot-password")
