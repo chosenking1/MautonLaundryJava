@@ -2,6 +2,7 @@ package com.work.mautonlaundry.dtos.requests.userrequests;
 
 import com.work.mautonlaundry.util.ValidEmail;
 import jakarta.validation.constraints.NotBlank;
+import com.work.mautonlaundry.util.PhoneNumbers;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -28,10 +29,10 @@ public class RegisterUserRequest {
     @NotBlank(message = "Email is required")
     private String email;
 
-    // Optional leading +, then 7–15 digits (E.164 range). Rejects "V" and other
-    // non-numeric input. Strip spaces/dashes client-side before sending.
+    // Nigerian mobile, 11 digits (see PhoneNumbers). Strip spaces/dashes
+    // client-side before sending.
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^\\+?[0-9]{7,15}$", message = "Enter a valid phone number")
+    @Pattern(regexp = PhoneNumbers.NIGERIAN_MOBILE_REGEX, message = PhoneNumbers.NIGERIAN_MOBILE_MESSAGE)
     private String phone_number;
     
     @NotBlank(message = "Password is required")

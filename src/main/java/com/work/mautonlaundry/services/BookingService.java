@@ -219,12 +219,9 @@ public class BookingService {
         applyPickupWindow(response, booking);
 
         
-        // Map address
-        BookingDetailsResponse.AddressInfo addressInfo = new BookingDetailsResponse.AddressInfo();
-        addressInfo.setLabel("Address");
-        addressInfo.setLine1(booking.getPickupAddress().getStreet() + " " + booking.getPickupAddress().getStreet_number());
-        addressInfo.setCity(booking.getPickupAddress().getCity());
-        response.setPickupAddress(addressInfo);
+        if (maySeePickupAddress(currentUser)) {
+            response.setPickupAddress(pickupAddressInfo(booking));
+        }
 
         // Map items
         response.setItems(mapBookingItems(booking));
@@ -455,12 +452,8 @@ public class BookingService {
             applyPickupWindow(response, booking);
             response.setItems(mapBookingItems(booking));
 
-            if (booking.getPickupAddress() != null) {
-                BookingDetailsResponse.AddressInfo addressInfo = new BookingDetailsResponse.AddressInfo();
-                addressInfo.setLabel("Address");
-                addressInfo.setLine1(booking.getPickupAddress().getStreet() + " " + booking.getPickupAddress().getStreet_number());
-                addressInfo.setCity(booking.getPickupAddress().getCity());
-                response.setPickupAddress(addressInfo);
+            if (maySeePickupAddress(caller)) {
+                response.setPickupAddress(pickupAddressInfo(booking));
             }
 
             // Same role-filtered handoff codes the detail endpoint returns,
@@ -477,6 +470,29 @@ public class BookingService {
 
             return response;
         });
+    }
+
+    /**
+     * Laundry partners never get the customer's address: riders bring the
+     * clothes to them and take them back, so a partner has no use for where
+     * the customer lives (data minimisation, NDPA; the privacy policy says
+     * they get order details only). The customer, admins and the assigned
+     * rider still see it. Distance-based assignment reads the coordinates
+     * server-side and never returns them.
+     */
+    static boolean maySeePickupAddress(AppUser caller) {
+        return caller != null && !caller.hasRole("LAUNDRY_AGENT");
+    }
+
+    private static BookingDetailsResponse.AddressInfo pickupAddressInfo(Booking booking) {
+        if (booking.getPickupAddress() == null) {
+            return null;
+        }
+        BookingDetailsResponse.AddressInfo addressInfo = new BookingDetailsResponse.AddressInfo();
+        addressInfo.setLabel("Address");
+        addressInfo.setLine1(booking.getPickupAddress().getStreet() + " " + booking.getPickupAddress().getStreet_number());
+        addressInfo.setCity(booking.getPickupAddress().getCity());
+        return addressInfo;
     }
 
     private List<BookingDetailsResponse.BookingItemInfo> mapBookingItems(Booking booking) {

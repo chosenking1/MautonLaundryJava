@@ -14,6 +14,9 @@ import java.util.List;
 public interface AddressRepository extends JpaRepository<Address, String> {
     List<Address> findByUserAndDeletedFalse(AppUser user );
 
+    /** Including soft-deleted ones: account deletion scrubs every address the user ever saved. */
+    List<Address> findByUser(AppUser user);
+
     @Modifying
     @Query("UPDATE Address a SET a.isDefault = false WHERE a.user.id = :userId")
     void clearDefaultForUser(@Param("userId") String userId);

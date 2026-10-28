@@ -3,6 +3,7 @@ package com.work.mautonlaundry.security.service;
 import com.work.mautonlaundry.data.model.AppUser;
 import com.work.mautonlaundry.data.repository.UserRepository;
 import com.work.mautonlaundry.dtos.requests.userrequests.UserLoginRequest;
+import com.work.mautonlaundry.services.AccountDeletionService;
 import lombok.AllArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,6 +21,7 @@ public class AuthServiceImpl implements AuthService {
     private AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
+    private final AccountDeletionService accountDeletionService;
 
     /**
      * @param loginDto
@@ -49,6 +51,12 @@ public class AuthServiceImpl implements AuthService {
                     "Your email is not verified yet. Check your inbox or resend the verification email.");
         }
         
+        // Logging in during the grace period is how a customer changes their
+        // mind (and what the scheduled-deletion email tells them to do). After
+        // the password and verification checks, so a failed attempt cancels
+        // nothing.
+        accountDeletionService.cancelOnLogin(user);
+
         if (user.getIsFirstLogin()) {
             user.setIsFirstLogin(false);
             userRepository.save(user);

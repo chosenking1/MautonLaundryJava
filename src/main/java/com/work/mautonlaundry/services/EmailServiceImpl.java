@@ -50,6 +50,48 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     @Async
+    public void sendAccountDeletionScheduled(String email, String firstName, String deletionDate) {
+        String subject = "Your account will be deleted on " + deletionDate + " - " + fromName;
+        sendEmail(email, subject, emailShell(
+                greet(firstName, "We've received your request."),
+                para("Your " + fromName + " account is scheduled to be deleted on <strong>"
+                        + deletionDate + "</strong>. Until then it is locked, and you have been "
+                        + "signed out of the app.")
+                        + para("On that date we'll remove your name, email, phone number and saved "
+                        + "addresses. Records of past orders and payments are kept without your "
+                        + "details, because the law requires us to keep them.")
+                        + note("Changed your mind? Just log in to the app before "
+                        + deletionDate + " and the deletion is cancelled.")
+                        + note("Didn't ask for this? Log in now to cancel it, then change your password.")));
+    }
+
+    @Override
+    @Async
+    public void sendAccountDeletionCancelled(String email, String firstName) {
+        sendEmail(email, "Your account deletion was cancelled - " + fromName, emailShell(
+                greet(firstName, "Welcome back."),
+                para("You logged in, so we've cancelled the request to delete your "
+                        + fromName + " account. Everything is as you left it.")
+                        + note("If this wasn't you, change your password straight away.")));
+    }
+
+    @Override
+    @Async
+    public void sendAccountDeleted(String email, String firstName) {
+        sendEmail(email, "Your account has been deleted - " + fromName, emailShell(
+                greet(firstName, "Your account has been deleted."),
+                para("As you asked, we've removed your name, email, phone number and saved "
+                        + "addresses from " + fromName + ". This is the last email we'll send "
+                        + "to this address.")
+                        + note("You're always welcome back -- you'd just need to sign up again.")));
+    }
+
+    private static String greet(String firstName, String fallback) {
+        return firstName == null || firstName.isBlank() ? fallback : "Hi " + firstName + ",";
+    }
+
+    @Override
+    @Async
     public void sendPasswordResetEmail(String email, String token) {
         // Point at the public HTML reset page (which renders a working new-password form),
         // not the JSON API endpoint.

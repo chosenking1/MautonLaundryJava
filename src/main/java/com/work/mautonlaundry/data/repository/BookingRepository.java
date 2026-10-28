@@ -29,6 +29,9 @@ public interface BookingRepository extends JpaRepository<Booking, String>,
         JpaSpecificationExecutor<Booking> {
     
     List<Booking> findByUserAndDeletedFalse(AppUser user);
+
+    /** Account deletion is refused while one of these is still in progress. */
+    boolean existsByUserAndDeletedFalseAndStatusNotIn(AppUser user, java.util.Collection<BookingStatus> finished);
     
     Page<Booking> findByUserAndDeletedFalse(AppUser user, Pageable pageable);
     

@@ -1,5 +1,6 @@
 package com.work.mautonlaundry.dtos.requests.userrequests;
 
+import com.work.mautonlaundry.util.PhoneNumbers;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
@@ -11,6 +12,6 @@ public class UpdateUserProfileRequest {
     @Pattern(regexp = "^[\\p{L}][\\p{L} .'-]*$", message = "Name must contain only letters")
     private String fullName;
 
-    @Pattern(regexp = "^\\+?[0-9]{7,15}$", message = "Enter a valid phone number")
+    @Pattern(regexp = PhoneNumbers.NIGERIAN_MOBILE_REGEX, message = PhoneNumbers.NIGERIAN_MOBILE_MESSAGE)
     private String phoneNumber;
 }

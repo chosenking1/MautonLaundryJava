@@ -13,6 +13,15 @@ public interface EmailService {
      */
     void sendWelcomeEmail(String email, String firstName);
 
+    /** Account deletion requested: when it happens and how to stop it. */
+    void sendAccountDeletionScheduled(String email, String firstName, String deletionDate);
+
+    /** The customer logged back in during the grace period. */
+    void sendAccountDeletionCancelled(String email, String firstName);
+
+    /** Sent to the original address once the account has been anonymised. */
+    void sendAccountDeleted(String email, String firstName);
+
     void sendPasswordResetEmail(String email, String token);
     /**
      * @param reference the order's tracking number as the customer sees it in

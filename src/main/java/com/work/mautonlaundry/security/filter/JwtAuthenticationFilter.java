@@ -1,6 +1,7 @@
 package com.work.mautonlaundry.security.filter;
 
 import com.work.mautonlaundry.security.service.JwtTokenProvider;
+import com.work.mautonlaundry.services.AccountDeletionService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,6 +11,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -26,9 +28,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private UserDetailsService userDetailsService;
 
-    public JwtAuthenticationFilter(@Lazy JwtTokenProvider jwtTokenProvider,@Lazy UserDetailsService userDetailsService) {
+    private AccountDeletionService accountDeletionService;
+
+    public JwtAuthenticationFilter(@Lazy JwtTokenProvider jwtTokenProvider,
+                                   @Lazy UserDetailsService userDetailsService,
+                                   @Lazy AccountDeletionService accountDeletionService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userDetailsService = userDetailsService;
+        this.accountDeletionService = accountDeletionService;
     }
 
     @Override
@@ -41,7 +48,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if(StringUtils.hasText(token) && !token.trim().isEmpty() && jwtTokenProvider.validateToken(token)){
             String username = jwtTokenProvider.getUsername(token);
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            // Tokens last 7 days and cannot be revoked, so the lock lives here:
+            // an account awaiting deletion is treated as signed out on every
+            // device until its owner logs in again (which cancels the request).
+            if (accountDeletionService.isPendingDeletion(username)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            UserDetails userDetails;
+            try {
+                userDetails = userDetailsService.loadUserByUsername(username);
+            } catch (UsernameNotFoundException e) {
+                // A deleted account's email is replaced, so its old tokens name
+                // nobody. Unauthenticated, not a 500.
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                     userDetails,
